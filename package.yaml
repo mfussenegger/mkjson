@@ -27,7 +27,7 @@ library:
   source-dirs: src
 
 executables:
-  fake-json-exe:
+  fake-json:
     main: Main.hs
     source-dirs: app
     ghc-options:
