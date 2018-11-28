@@ -1,0 +1,47 @@
+---
+name: fake-json
+version: 0.1.0.0
+github: "mfussenegger/fake-json"
+license: MIT
+author: "Mathias Fußenegger"
+maintainer: "github@zignar.net"
+copyright: "2018 Mathias Fußenegger"
+
+extra-source-files:
+  - README.md
+  - ChangeLog.md
+
+description: |
+  Please see the README on GitHub at <https://github.com/mfussenegger/fake-json#readme>
+
+dependencies:
+  - base >= 4.7 && < 5
+  - text
+  - faker
+  - aeson
+  - bytestring
+  - scientific
+  - uuid
+
+library:
+  source-dirs: src
+
+executables:
+  fake-json-exe:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+      - -rtsopts
+    dependencies:
+      - fake-json
+
+tests:
+  fake-json-test:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - fake-json
