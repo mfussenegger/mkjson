@@ -17,7 +17,6 @@ description: |
 dependencies:
   - base >= 4.7 && < 5
   - text
-  - faker
   - aeson
   - bytestring
   - scientific
