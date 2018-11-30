@@ -68,15 +68,6 @@ asInt (String s) =
 asInt o          = error $ "Expected an integer but received: " <> show o
 
 
-withGen :: (StdGen -> (a, StdGen)) -> State a
-withGen f = do
-  stdGen <- State.get
-  let
-    (x, newGen) = f stdGen
-  State.put newGen
-  pure x
-
-
 -- | Create a value getter for an expression
 --
 -- >>> let g = mkStdGen 1
@@ -93,12 +84,12 @@ withGen f = do
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
-eval (FunctionCall "uuid4" []) = String . UUID.toText <$> withGen random
+eval (FunctionCall "uuid4" []) = String . UUID.toText <$> State.state random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
 eval (FunctionCall "randomInt" [lower, upper]) = do
   lower' <- asInt <$> eval lower
   upper' <- asInt <$> eval upper
-  Number . fromIntegral <$> withGen (randomR (lower', upper'))
+  Number . fromIntegral <$> State.state (randomR (lower', upper'))
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
