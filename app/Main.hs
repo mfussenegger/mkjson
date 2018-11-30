@@ -89,10 +89,10 @@ main = do
     errored = lefts $ fmap snd allExpressions
     providers = fmap (\(x, y) -> (x, eval y)) expressions
   if null errored
-    then forever $ do
-      obj <- encode . object <$> mapM runProvider providers
-      BL.putStrLn obj
-    else mapM_ print errored
+    then forever $
+      mapM runProvider providers >>= BL.putStrLn . encode . object
+    else
+      mapM_ print errored
   where
     unpackRight (x, Right y) = (x, y)
     unpackRight _            = error "Tuple must only contain Right eithers"
