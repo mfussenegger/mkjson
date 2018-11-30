@@ -14,6 +14,10 @@ extra-source-files:
 description: |
   Please see the README on GitHub at <https://github.com/mfussenegger/fake-json#readme>
 
+ghc-options:
+  - -Wall
+  - -fno-warn-unused-do-bind
+
 dependencies:
   - base >= 4.7 && < 5
   - text
@@ -21,6 +25,9 @@ dependencies:
   - bytestring
   - scientific
   - uuid
+  - parsec
+  - random
+  - scientific
 
 library:
   source-dirs: src
@@ -36,11 +43,17 @@ executables:
 
 tests:
   fake-json-test:
-    main: Spec.hs
-    source-dirs: test
+    main: spec.hs
+    source-dirs: tests
     ghc-options:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
       - fake-json
+  fake-json-doctest:
+    main: doctests.hs
+    source-dirs: tests
+    dependencies:
+      - fake-json
+      - doctest

@@ -2,26 +2,30 @@
 
 module Main where
 
-import           Control.Monad              (forM_, forever)
+import           Control.Monad              (forever)
 import           Data.Aeson                 (Value (..), encode, object)
 import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified Data.List                  as L
-import           Data.Maybe                 (mapMaybe)
+import           Data.Either                (isRight, lefts)
+import           Data.Maybe                 (fromJust, mapMaybe)
+import qualified Data.Scientific            as S
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import qualified Data.Text.Read             as T
 import qualified Data.UUID                  as UUID
-import qualified Data.UUID.V4               as UUID4
 import qualified Data.UUID.V1               as UUID1
-import           Lib
+import qualified Data.UUID.V4               as UUID4
+import           Expr                       (Expr (..), parseExpr)
 import           System.Environment         (getArgs)
+import           System.Random              (getStdGen, randomR, setStdGen)
 
+-- $setup
+-- >>> :set -XOverloadedStrings
 
 parseColumnDefinition :: String -> Maybe (Text, Text)
-parseColumnDefinition x = 
+parseColumnDefinition x =
   case parts of
-    [x, y]  -> Just (x, y)
-    _       -> Nothing
+    [columnName, providerName] -> Just (columnName, providerName)
+    _                          -> Nothing
   where
     text = T.pack x
     parts = T.splitOn "=" text
@@ -35,10 +39,44 @@ uuid1 = do
     Nothing  -> uuid1
 
 
-lookupProvider :: Text -> IO Value
-lookupProvider "uuid4" = String . UUID.toText <$> UUID4.nextRandom
-lookupProvider "uuid1" = String . UUID.toText <$> uuid1
-lookupProvider _       = pure $ String "foobar"
+-- | Try to extract an Int from Value
+--
+-- >>> asInt (Number 10)
+-- 10
+--
+-- >>> asInt (String "10")
+-- 10
+--
+-- >>> asInt (String "foo")
+-- *** Exception: Expected an integer, but received: foo
+-- ...
+asInt :: Value -> Int
+asInt (Number n) = fromJust $ S.toBoundedInteger n
+asInt (String s) =
+  case T.decimal s of
+    (Right (n, _)) -> n
+    (Left _)       -> error $ "Expected an integer, but received: " <> T.unpack s
+asInt o          = error $ "Expected an integer but received: " <> show o
+
+
+-- | Create a value getter for an expression
+--
+-- >>> eval $ FunctionCall "randomInt" [IntLiteral 1, IntLiteral 1]
+-- Number 1.0
+eval :: Expr -> IO Value
+eval (IntLiteral x)    = pure $ Number $ fromInteger x
+eval (StringLiteral x) = pure $ String x
+eval (FunctionCall "uuid4" []) = String . UUID.toText <$> UUID4.nextRandom
+eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
+eval (FunctionCall "randomInt" [lower, upper]) = do
+  lower' <- asInt <$> eval lower
+  upper' <- asInt <$> eval upper
+  stdGen <- getStdGen
+  let
+    (rndNumber, newStdGen) = randomR (lower', upper') stdGen
+  setStdGen newStdGen
+  pure $ Number $ fromIntegral rndNumber
+eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
 
 main :: IO ()
@@ -46,11 +84,18 @@ main = do
   args <- getArgs
   let 
     columns = mapMaybe parseColumnDefinition args
-    providers = fmap (\(x, y) -> (x, lookupProvider y)) columns
-  forever $ do
-    obj <- encode . object <$> mapM runProvider providers
-    BL.putStrLn obj
+    allExpressions = fmap (\(x, y) -> (x, parseExpr y)) columns
+    expressions = fmap unpackRight (filter (isRight . snd) allExpressions)
+    errored = lefts $ fmap snd allExpressions
+    providers = fmap (\(x, y) -> (x, eval y)) expressions
+  if null errored
+    then forever $ do
+      obj <- encode . object <$> mapM runProvider providers
+      BL.putStrLn obj
+    else mapM_ print errored
   where
+    unpackRight (x, Right y) = (x, y)
+    unpackRight _            = error "Tuple must only contain Right eithers"
     runProvider (column, provider) = do
       val <- provider
       pure (column, val)
