@@ -20,6 +20,8 @@ a field within the JSON object.
  - randomInt(lower, upper)
  - randomDouble(lower, upper)
  - array(expr [, expr ... ])
+ - oneOf(arrayExpr)
+ - oneOf(expr, expr [, expr ... ])
 
 
 ## Installation

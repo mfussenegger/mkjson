@@ -88,6 +88,11 @@ asDouble (String s) =
 asDouble o          = error $ "Expected a double, but received: " <> show o
 
 
+asArray :: Value -> V.Vector Value
+asArray (Array x) = x
+asArray o         = error $ "Expected an array, but received: " <> show o
+
+
 -- | Create a value getter for an expression
 --
 -- >>> let g = mkStdGen 1
@@ -101,6 +106,12 @@ asDouble o          = error $ "Expected a double, but received: " <> show o
 --
 -- >>> exec "array(randomInt(1, 10), randomDouble(1, 20))"
 -- Array [Number 6.0,Number 14.108305934824038]
+--
+-- >>> exec "oneOf(array(37, 42, 21))"
+-- Number 21.0
+--
+-- >>> exec "oneOf(37, 42, 21)"
+-- Number 21.0
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
@@ -115,6 +126,13 @@ eval (FunctionCall "randomDouble" [lower, upper]) = do
   upper' <- asDouble <$> eval upper
   Number . S.fromFloatDigits <$> State.state (randomR (lower', upper'))
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
+eval (FunctionCall "oneOf" [arg]) = do
+  arr <- asArray <$> eval arg
+  idx <- State.state $ randomR (0, length arr - 1)
+  pure $ V.unsafeIndex arr idx
+eval (FunctionCall "oneOf" args) = do
+  idx <- State.state $ randomR (0, length args - 1)
+  eval (args !! idx)
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
 
@@ -122,7 +140,7 @@ main :: IO ()
 main = do
   args <- getArgs
   stdGen <- newStdGen
-  let 
+  let
     columns = mapMaybe parseColumnDefinition args
     allExpressions = fmap (\(x, y) -> (x, parseExpr y)) columns
     expressions = fmap unpackRight (filter (isRight . snd) allExpressions)
