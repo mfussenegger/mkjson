@@ -29,6 +29,7 @@ dependencies:
   - random
   - scientific
   - transformers
+  - vector
 
 library:
   source-dirs: src

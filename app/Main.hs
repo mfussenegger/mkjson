@@ -17,6 +17,7 @@ import qualified Data.Text                        as T
 import qualified Data.Text.Read                   as T
 import qualified Data.UUID                        as UUID
 import qualified Data.UUID.V1                     as UUID1
+import qualified Data.Vector                      as V
 import           Expr                             (Expr (..), parseExpr)
 import           System.Environment               (getArgs)
 import           System.Random                    (StdGen, newStdGen, random,
@@ -78,11 +79,17 @@ withGen f = do
 
 -- | Create a value getter for an expression
 --
--- >>> State.evalStateT (eval "randomInt(1, 2)") (mkStdGen 1)
+-- >>> let g = mkStdGen 1
+-- >>> let exec expr = State.evalStateT (eval expr) g
+--
+-- >>> exec "randomInt(1, 2)"
 -- Number 2.0
 --
--- >>> State.evalStateT (eval "uuid4") (mkStdGen 1)
+-- >>> exec "uuid4"
 -- String "0099a82c-36f7-4321-8012-daa4305fd84b"
+--
+-- >>> exec "array(randomInt(1, 10), randomInt(1, 20))"
+-- Array [Number 6.0,Number 7.0]
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
@@ -92,6 +99,7 @@ eval (FunctionCall "randomInt" [lower, upper]) = do
   lower' <- asInt <$> eval lower
   upper' <- asInt <$> eval upper
   Number . fromIntegral <$> withGen (randomR (lower', upper'))
+eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
 
