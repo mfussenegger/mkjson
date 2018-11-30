@@ -68,6 +68,26 @@ asInt (String s) =
 asInt o          = error $ "Expected an integer but received: " <> show o
 
 
+-- | Try to extract a Double from Value
+--
+-- >>> asDouble (Number 10.3)
+-- 10.3
+--
+-- >>> asDouble (String "10.5")
+-- 10.5
+--
+-- >>> asDouble (String "foo")
+-- *** Exception: Expected a double, but received: foo
+-- ...
+asDouble :: Value -> Double
+asDouble (Number n) = S.toRealFloat n
+asDouble (String s) =
+  case T.double s of
+    (Right (n, _)) -> n
+    (Left _)       -> error $ "Expected a double, but received: " <> T.unpack s
+asDouble o          = error $ "Expected a double, but received: " <> show o
+
+
 -- | Create a value getter for an expression
 --
 -- >>> let g = mkStdGen 1
@@ -79,8 +99,8 @@ asInt o          = error $ "Expected an integer but received: " <> show o
 -- >>> exec "uuid4"
 -- String "0099a82c-36f7-4321-8012-daa4305fd84b"
 --
--- >>> exec "array(randomInt(1, 10), randomInt(1, 20))"
--- Array [Number 6.0,Number 7.0]
+-- >>> exec "array(randomInt(1, 10), randomDouble(1, 20))"
+-- Array [Number 6.0,Number 14.108305934824038]
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
@@ -90,6 +110,10 @@ eval (FunctionCall "randomInt" [lower, upper]) = do
   lower' <- asInt <$> eval lower
   upper' <- asInt <$> eval upper
   Number . fromIntegral <$> State.state (randomR (lower', upper'))
+eval (FunctionCall "randomDouble" [lower, upper]) = do
+  lower' <- asDouble <$> eval lower
+  upper' <- asDouble <$> eval upper
+  Number . S.fromFloatDigits <$> State.state (randomR (lower', upper'))
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
