@@ -3,6 +3,7 @@
 module Expr where
 
 import           Data.Maybe        (fromMaybe)
+import           Data.String       (IsString(..))
 import           Data.Text         (Text)
 import qualified Data.Text         as T
 import           Text.Parsec       (many, many1, optionMaybe, parse, sepBy,
@@ -18,6 +19,13 @@ data Expr = IntLiteral Integer
           | StringLiteral Text
           | FunctionCall { fcName :: Text, fcArgs :: [Expr] }
           deriving (Show, Eq)
+
+
+instance IsString Expr where
+  fromString s =
+    case parseExpr (T.pack s) of
+      (Left err) -> error $ show err
+      (Right e)  -> e
 
 expr :: Parser Expr
 expr = literal <|> functionCall

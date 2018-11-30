@@ -28,6 +28,7 @@ dependencies:
   - parsec
   - random
   - scientific
+  - transformers
 
 library:
   source-dirs: src

@@ -2,24 +2,32 @@
 
 module Main where
 
-import           Control.Monad              (forever)
-import           Data.Aeson                 (Value (..), encode, object)
-import qualified Data.ByteString.Lazy.Char8 as BL
-import           Data.Either                (isRight, lefts)
-import           Data.Maybe                 (fromJust, mapMaybe)
-import qualified Data.Scientific            as S
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import qualified Data.Text.Read             as T
-import qualified Data.UUID                  as UUID
-import qualified Data.UUID.V1               as UUID1
-import qualified Data.UUID.V4               as UUID4
-import           Expr                       (Expr (..), parseExpr)
-import           System.Environment         (getArgs)
-import           System.Random              (getStdGen, randomR, setStdGen)
+
+import           Control.Monad                    (forever)
+import           Control.Monad.IO.Class           (liftIO)
+import           Control.Monad.Trans.State.Strict (StateT)
+import qualified Control.Monad.Trans.State.Strict as State
+import           Data.Aeson                       (Value (..), encode, object)
+import qualified Data.ByteString.Lazy.Char8       as BL
+import           Data.Either                      (isRight, lefts)
+import           Data.Maybe                       (fromJust, mapMaybe)
+import qualified Data.Scientific                  as S
+import           Data.Text                        (Text)
+import qualified Data.Text                        as T
+import qualified Data.Text.Read                   as T
+import qualified Data.UUID                        as UUID
+import qualified Data.UUID.V1                     as UUID1
+import           Expr                             (Expr (..), parseExpr)
+import           System.Environment               (getArgs)
+import           System.Random                    (StdGen, newStdGen, random,
+                                                   randomR)
 
 -- $setup
 -- >>> :set -XOverloadedStrings
+-- >>> import System.Random (mkStdGen)
+
+type State a = StateT StdGen IO a
+
 
 parseColumnDefinition :: String -> Maybe (Text, Text)
 parseColumnDefinition x =
@@ -31,9 +39,9 @@ parseColumnDefinition x =
     parts = T.splitOn "=" text
 
 
-uuid1 :: IO UUID.UUID
+uuid1 :: State UUID.UUID
 uuid1 = do
-  uuid <- UUID1.nextUUID
+  uuid <- liftIO UUID1.nextUUID
   case uuid of
     (Just u) -> pure u
     Nothing  -> uuid1
@@ -61,20 +69,28 @@ asInt o          = error $ "Expected an integer but received: " <> show o
 
 -- | Create a value getter for an expression
 --
--- >>> eval $ FunctionCall "randomInt" [IntLiteral 1, IntLiteral 1]
--- Number 1.0
-eval :: Expr -> IO Value
+-- >>> State.evalStateT (eval "randomInt(1, 2)") (mkStdGen 1)
+-- Number 2.0
+--
+-- >>> State.evalStateT (eval "uuid4") (mkStdGen 1)
+-- String "0099a82c-36f7-4321-8012-daa4305fd84b"
+eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
-eval (FunctionCall "uuid4" []) = String . UUID.toText <$> UUID4.nextRandom
+eval (FunctionCall "uuid4" []) = do
+  stdGen <- State.get
+  let
+    (uuid, newGen) = random stdGen
+  State.put newGen
+  pure $ String $ UUID.toText uuid
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
 eval (FunctionCall "randomInt" [lower, upper]) = do
   lower' <- asInt <$> eval lower
   upper' <- asInt <$> eval upper
-  stdGen <- getStdGen
+  stdGen <- State.get
   let
-    (rndNumber, newStdGen) = randomR (lower', upper') stdGen
-  setStdGen newStdGen
+    (rndNumber, newGen) = randomR (lower', upper') stdGen
+  State.put newGen
   pure $ Number $ fromIntegral rndNumber
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
@@ -82,6 +98,7 @@ eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 main :: IO ()
 main = do
   args <- getArgs
+  stdGen <- newStdGen
   let 
     columns = mapMaybe parseColumnDefinition args
     allExpressions = fmap (\(x, y) -> (x, parseExpr y)) columns
@@ -89,8 +106,12 @@ main = do
     errored = lefts $ fmap snd allExpressions
     providers = fmap (\(x, y) -> (x, eval y)) expressions
   if null errored
-    then forever $
-      mapM runProvider providers >>= BL.putStrLn . encode . object
+    then
+      let
+        printRecords = forever $
+          mapM runProvider providers >>= liftIO . BL.putStrLn . encode . object
+      in
+        State.runStateT printRecords stdGen >> pure ()
     else
       mapM_ print errored
   where
