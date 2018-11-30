@@ -3,7 +3,7 @@
 module Main where
 
 
-import           Control.Monad                    (forever)
+import           Control.Monad                    (forever, replicateM)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
@@ -112,6 +112,9 @@ asArray o         = error $ "Expected an array, but received: " <> show o
 --
 -- >>> exec "oneOf(37, 42, 21)"
 -- Number 21.0
+--
+-- >>> exec "replicate(randomInt(2, 4), oneOf(37, 42, 21))"
+-- Array [Number 42.0,Number 42.0,Number 21.0,Number 42.0]
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
@@ -133,6 +136,9 @@ eval (FunctionCall "oneOf" [arg]) = do
 eval (FunctionCall "oneOf" args) = do
   idx <- State.state $ randomR (0, length args - 1)
   eval (args !! idx)
+eval (FunctionCall "replicate" [num, expr]) = do
+  num' <- asInt <$> eval num
+  Array . V.fromList <$> replicateM num' (eval expr)
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
 

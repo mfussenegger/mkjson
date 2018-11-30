@@ -22,6 +22,7 @@ a field within the JSON object.
  - array(expr [, expr ... ])
  - oneOf(arrayExpr)
  - oneOf(expr, expr [, expr ... ])
+ - replicate(number, expr)
 
 
 ## Installation
