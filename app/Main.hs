@@ -3,7 +3,7 @@
 module Main where
 
 
-import           Control.Monad                    (forever, replicateM)
+import           Control.Monad                    (forever, replicateM, forM)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
@@ -93,6 +93,19 @@ asArray (Array x) = x
 asArray o         = error $ "Expected an array, but received: " <> show o
 
 
+-- | Try to extract a Text from Value
+--
+-- >>> asText (String "foo")
+-- "foo"
+--
+-- >>> asText (Number 10.3)
+-- "10.3"
+asText :: Value -> Text
+asText (String t) = t
+asText (Number n) = T.pack $ show n
+asText o          = error $ "Expected a string, but received: " <> show o
+
+
 -- | Create a value getter for an expression
 --
 -- >>> let g = mkStdGen 1
@@ -115,6 +128,9 @@ asArray o         = error $ "Expected an array, but received: " <> show o
 --
 -- >>> exec "replicate(randomInt(2, 4), oneOf(37, 42, 21))"
 -- Array [Number 42.0,Number 42.0,Number 21.0,Number 42.0]
+--
+-- >>> exec "object('x', randomInt(2, 4), oneOf('y', 'z'), 3)"
+-- Object (fromList [("x",Number 4.0),("y",Number 3.0)])
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
@@ -139,6 +155,17 @@ eval (FunctionCall "oneOf" args) = do
 eval (FunctionCall "replicate" [num, expr]) = do
   num' <- asInt <$> eval num
   Array . V.fromList <$> replicateM num' (eval expr)
+eval (FunctionCall "object" args) = do
+  let
+    keyValuePairs = mkPairs (fmap eval args)
+    mkPairs [] = []
+    mkPairs [_] = error "Arguments to object must be a multiple of 2 (key + value pairs)"
+    mkPairs (x : y : rest) = (x, y) : mkPairs rest
+  pairs <- forM keyValuePairs (\(key, val) -> do
+    key' <- asText <$> key
+    val' <- val
+    pure (key', val'))
+  pure $ object pairs
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
 

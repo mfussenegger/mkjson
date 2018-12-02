@@ -19,10 +19,11 @@ a field within the JSON object.
  - uuid4
  - randomInt(lower, upper)
  - randomDouble(lower, upper)
- - array(expr [, expr ... ])
+ - array(expr [, ...])
  - oneOf(arrayExpr)
- - oneOf(expr, expr [, expr ... ])
+ - oneOf(expr, expr [, ...])
  - replicate(number, expr)
+ - object(key, value [, ...])
 
 
 ## Installation
