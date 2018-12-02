@@ -3,7 +3,7 @@
 module Main where
 
 
-import           Control.Monad                    (forever, replicateM, forM)
+import           Control.Monad                    (forever, forM)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
@@ -154,7 +154,7 @@ eval (FunctionCall "oneOf" args) = do
   eval (args !! idx)
 eval (FunctionCall "replicate" [num, expr]) = do
   num' <- asInt <$> eval num
-  Array . V.fromList <$> replicateM num' (eval expr)
+  Array <$> V.replicateM num' (eval expr)
 eval (FunctionCall "object" args) = do
   let
     keyValuePairs = mkPairs (fmap eval args)
