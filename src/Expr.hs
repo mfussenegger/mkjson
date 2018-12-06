@@ -39,7 +39,7 @@ number = IntLiteral . read <$> many1 digit
 stringLiteral :: Parser Expr
 stringLiteral = do
   _ <- char '\''
-  content <- many1 (noneOf "\'")
+  content <- many (noneOf "\'")
   _ <- char '\''
   pure $ StringLiteral $ T.pack content
 
@@ -78,5 +78,8 @@ ident = do
 --
 -- >>> parseExpr "'fileName-200.txt'"
 -- Right (StringLiteral "fileName-200.txt")
+--
+-- >>> parseExpr "''"
+-- Right (StringLiteral "")
 parseExpr :: Text -> Either ParseError Expr
 parseExpr = parse expr "(unknown)"
