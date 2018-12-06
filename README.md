@@ -24,6 +24,7 @@ a field within the JSON object.
  - oneOf(expr, expr [, ...])
  - replicate(number, expr)
  - object(key, value [, ...])
+ - fromFile(fileName)
 
 
 ## Installation

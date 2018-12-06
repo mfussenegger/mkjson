@@ -3,7 +3,7 @@
 module Main where
 
 
-import           Control.Monad                    (forever, forM)
+import           Control.Monad                    (forM, forever)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
@@ -14,11 +14,13 @@ import           Data.Maybe                       (fromJust, mapMaybe)
 import qualified Data.Scientific                  as S
 import           Data.Text                        (Text)
 import qualified Data.Text                        as T
+import qualified Data.Text.Encoding               as T
 import qualified Data.Text.Read                   as T
 import qualified Data.UUID                        as UUID
 import qualified Data.UUID.V1                     as UUID1
 import qualified Data.Vector                      as V
 import           Expr                             (Expr (..), parseExpr)
+import           Prelude                          hiding (lines)
 import           System.Environment               (getArgs)
 import           System.Random                    (StdGen, newStdGen, random,
                                                    randomR)
@@ -166,6 +168,12 @@ eval (FunctionCall "object" args) = do
     val' <- val
     pure (key', val'))
   pure $ object pairs
+eval (FunctionCall "fromFile" [fileName]) = do
+  fileName' <- asText <$> eval fileName
+  contents <- liftIO $ BL.readFile (T.unpack fileName')
+  let
+    lines = V.fromList $ BL.lines contents
+  pure $ Array $ fmap (String . T.decodeUtf8 . BL.toStrict) lines
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
 
