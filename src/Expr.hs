@@ -3,12 +3,12 @@
 module Expr where
 
 import           Data.Maybe        (fromMaybe)
-import           Data.String       (IsString(..))
+import           Data.String       (IsString (..))
 import           Data.Text         (Text)
 import qualified Data.Text         as T
-import           Text.Parsec       (many, many1, optionMaybe, parse, sepBy,
-                                    (<|>))
-import           Text.Parsec.Char  (char, digit, letter, spaces)
+import           Text.Parsec       (many, many1, optionMaybe, parse,
+                                    sepBy, (<|>))
+import           Text.Parsec.Char  (char, digit, letter, spaces, noneOf)
 import           Text.Parsec.Error (ParseError)
 import           Text.Parsec.Text  (Parser)
 
@@ -39,7 +39,7 @@ number = IntLiteral . read <$> many1 digit
 stringLiteral :: Parser Expr
 stringLiteral = do
   _ <- char '\''
-  content <- many1 letter
+  content <- many1 (noneOf "\'")
   _ <- char '\''
   pure $ StringLiteral $ T.pack content
 
@@ -75,5 +75,8 @@ ident = do
 --
 -- >>> parseExpr "randomInt(0, 10)"
 -- Right (FunctionCall {fcName = "randomInt", fcArgs = [IntLiteral 0,IntLiteral 10]})
+--
+-- >>> parseExpr "'fileName-200.txt'"
+-- Right (StringLiteral "fileName-200.txt")
 parseExpr :: Text -> Either ParseError Expr
 parseExpr = parse expr "(unknown)"
