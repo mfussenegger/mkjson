@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
@@ -20,6 +21,7 @@ import qualified Data.Text.Read                   as T
 import qualified Data.UUID                        as UUID
 import qualified Data.UUID.V1                     as UUID1
 import qualified Data.Vector                      as V
+import qualified Data.HashMap.Strict              as M
 import           Expr                             (Expr (..), parseExpr)
 import           Prelude                          hiding (lines)
 import           System.Environment               (getArgs)
@@ -30,7 +32,21 @@ import           System.Random                    (StdGen, newStdGen, random,
 -- >>> :set -XOverloadedStrings
 -- >>> import System.Random (mkStdGen)
 
-type State a = StateT StdGen IO a
+type State a = StateT Env IO a
+
+
+data Env = Env
+  { envStdGen :: StdGen
+  , envFileCache :: M.HashMap Text (V.Vector Value) }
+
+
+withStdGen :: (StdGen -> (a, StdGen)) -> State a
+withStdGen f = do
+  e@Env{..} <- State.get
+  let
+    (x, stdGen) = f envStdGen
+  State.put $ e { envStdGen = stdGen }
+  pure x
 
 
 parseColumnDefinition :: String -> Maybe (Text, Text)
@@ -111,7 +127,7 @@ asText o          = error $ "Expected a string, but received: " <> show o
 
 -- | Create a value getter for an expression
 --
--- >>> let g = mkStdGen 1
+-- >>> let g = Env (mkStdGen 1) M.empty
 -- >>> let exec expr = State.evalStateT (eval expr) g
 --
 -- >>> exec "randomInt(1, 2)"
@@ -137,23 +153,23 @@ asText o          = error $ "Expected a string, but received: " <> show o
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
-eval (FunctionCall "uuid4" []) = String . UUID.toText <$> State.state random
+eval (FunctionCall "uuid4" []) = String . UUID.toText <$> withStdGen random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
 eval (FunctionCall "randomInt" [lower, upper]) = do
   lower' <- asInt <$> eval lower
   upper' <- asInt <$> eval upper
-  Number . fromIntegral <$> State.state (randomR (lower', upper'))
+  Number . fromIntegral <$> withStdGen (randomR (lower', upper'))
 eval (FunctionCall "randomDouble" [lower, upper]) = do
   lower' <- asDouble <$> eval lower
   upper' <- asDouble <$> eval upper
-  Number . S.fromFloatDigits <$> State.state (randomR (lower', upper'))
+  Number . S.fromFloatDigits <$> withStdGen (randomR (lower', upper'))
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
 eval (FunctionCall "oneOf" [arg]) = do
   arr <- asArray <$> eval arg
-  idx <- State.state $ randomR (0, length arr - 1)
+  idx <- withStdGen $ randomR (0, length arr - 1)
   pure $ V.unsafeIndex arr idx
 eval (FunctionCall "oneOf" args) = do
-  idx <- State.state $ randomR (0, length args - 1)
+  idx <- withStdGen $ randomR (0, length args - 1)
   eval (args !! idx)
 eval (FunctionCall "replicate" [num, expr]) = do
   num' <- asInt <$> eval num
@@ -171,10 +187,15 @@ eval (FunctionCall "object" args) = do
   pure $ object pairs
 eval (FunctionCall "fromFile" [fileName]) = do
   fileName' <- asText <$> eval fileName
-  contents <- liftIO $ BS.readFile (T.unpack fileName')
-  let
-    lines = V.fromList $ BS.lines contents
-  pure $ Array $ fmap (String . T.decodeUtf8) lines
+  e@Env{..} <- State.get
+  case M.lookup fileName' envFileCache of
+    (Just lines) -> pure $ Array lines
+    Nothing      -> do
+      contents <- liftIO $ BS.readFile (T.unpack fileName')
+      let
+        lines = V.fromList $ fmap (String . T.decodeUtf8) (BS.lines contents)
+      State.put e { envFileCache = M.insert fileName' lines envFileCache }
+      pure $ Array lines
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
 
@@ -188,13 +209,14 @@ main = do
     expressions = fmap unpackRight (filter (isRight . snd) allExpressions)
     errored = lefts $ fmap snd allExpressions
     providers = fmap (\(x, y) -> (x, eval y)) expressions
+    env = Env stdGen M.empty
   if null errored
     then
       let
         printRecords = forever $
           mapM runProvider providers >>= liftIO . BL.putStrLn . encode . object
       in
-        State.runStateT printRecords stdGen >> pure ()
+        State.runStateT printRecords env >> pure ()
     else
       mapM_ print errored
   where

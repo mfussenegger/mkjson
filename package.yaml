@@ -30,6 +30,7 @@ dependencies:
   - scientific
   - transformers
   - vector
+  - unordered-containers
 
 library:
   source-dirs: src
