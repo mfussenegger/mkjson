@@ -8,6 +8,7 @@ import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import           Data.Aeson                       (Value (..), encode, object)
+import qualified Data.ByteString.Char8            as BS
 import qualified Data.ByteString.Lazy.Char8       as BL
 import           Data.Either                      (isRight, lefts)
 import           Data.Maybe                       (fromJust, mapMaybe)
@@ -170,10 +171,10 @@ eval (FunctionCall "object" args) = do
   pure $ object pairs
 eval (FunctionCall "fromFile" [fileName]) = do
   fileName' <- asText <$> eval fileName
-  contents <- liftIO $ BL.readFile (T.unpack fileName')
+  contents <- liftIO $ BS.readFile (T.unpack fileName')
   let
-    lines = V.fromList $ BL.lines contents
-  pure $ Array $ fmap (String . T.decodeUtf8 . BL.toStrict) lines
+    lines = V.fromList $ BS.lines contents
+  pure $ Array $ fmap (String . T.decodeUtf8) lines
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
 
 
