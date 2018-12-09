@@ -16,6 +16,7 @@ import           Text.Parsec.Text  (Parser)
 -- >>> :set -XOverloadedStrings
 
 data Expr = IntLiteral Integer
+          | DoubleLiteral Double
           | StringLiteral Text
           | FunctionCall { fcName :: Text, fcArgs :: [Expr] }
           deriving (Show, Eq)
@@ -27,14 +28,28 @@ instance IsString Expr where
       (Left err) -> error $ show err
       (Right e)  -> e
 
+
 expr :: Parser Expr
 expr = literal <|> functionCall
+
 
 literal :: Parser Expr
 literal = number <|> stringLiteral
 
+
 number :: Parser Expr
-number = IntLiteral . read <$> many1 digit
+number = do
+  integer <- many1 digit
+  optionalDot <- optionMaybe (char '.')
+  case optionalDot of
+    Nothing  -> pure $ IntLiteral (read integer)
+    (Just _) -> do
+      fractional <- many digit
+      let
+        value :: Double
+        value = read $ integer <> "." <> fractional
+      pure $ DoubleLiteral value
+
 
 stringLiteral :: Parser Expr
 stringLiteral = do
@@ -64,11 +79,13 @@ ident = do
   pure $ T.pack (firstChar : next)
 
 
-
 -- | Parse an expression
 --
 -- >>> parseExpr "20"
 -- Right (IntLiteral 20)
+--
+-- >>> parseExpr "20.3"
+-- Right (DoubleLiteral 20.3)
 --
 -- >>> parseExpr "uuid4"
 -- Right (FunctionCall {fcName = "uuid4", fcArgs = []})

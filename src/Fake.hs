@@ -78,8 +78,8 @@ randomInt lower upper = do
 
 -- | Generate a random double
 --
--- >>> exec "randomDouble(1, 3)"
--- Number 1.1555807501666868
+-- >>> exec "randomDouble(1.5, 3)"
+-- Number 1.6166855626250152
 randomDouble :: Expr -> Expr -> State Value
 randomDouble lower upper = do
   lower' <- A.asDouble <$> eval lower
@@ -162,6 +162,7 @@ fromFile fileName = do
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
+eval (DoubleLiteral x) = pure $ Number $ S.fromFloatDigits x
 eval (FunctionCall "uuid4" []) = String . UUID.toText <$> withStdGen random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
 eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
