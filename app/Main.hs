@@ -4,6 +4,7 @@
 module Main where
 
 
+import qualified Aeson                            as A
 import           Control.Monad                    (forM, forever)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.State.Strict (StateT)
@@ -12,16 +13,15 @@ import           Data.Aeson                       (Value (..), encode, object)
 import qualified Data.ByteString.Char8            as BS
 import qualified Data.ByteString.Lazy.Char8       as BL
 import           Data.Either                      (isRight, lefts)
-import           Data.Maybe                       (fromJust, mapMaybe)
+import qualified Data.HashMap.Strict              as M
+import           Data.Maybe                       (mapMaybe)
 import qualified Data.Scientific                  as S
 import           Data.Text                        (Text)
 import qualified Data.Text                        as T
 import qualified Data.Text.Encoding               as T
-import qualified Data.Text.Read                   as T
 import qualified Data.UUID                        as UUID
 import qualified Data.UUID.V1                     as UUID1
 import qualified Data.Vector                      as V
-import qualified Data.HashMap.Strict              as M
 import           Expr                             (Expr (..), parseExpr)
 import           Prelude                          hiding (lines)
 import           System.Environment               (getArgs)
@@ -67,64 +67,6 @@ uuid1 = do
     Nothing  -> uuid1
 
 
--- | Try to extract an Int from Value
---
--- >>> asInt (Number 10)
--- 10
---
--- >>> asInt (String "10")
--- 10
---
--- >>> asInt (String "foo")
--- *** Exception: Expected an integer, but received: foo
--- ...
-asInt :: Value -> Int
-asInt (Number n) = fromJust $ S.toBoundedInteger n
-asInt (String s) =
-  case T.decimal s of
-    (Right (n, _)) -> n
-    (Left _)       -> error $ "Expected an integer, but received: " <> T.unpack s
-asInt o          = error $ "Expected an integer but received: " <> show o
-
-
--- | Try to extract a Double from Value
---
--- >>> asDouble (Number 10.3)
--- 10.3
---
--- >>> asDouble (String "10.5")
--- 10.5
---
--- >>> asDouble (String "foo")
--- *** Exception: Expected a double, but received: foo
--- ...
-asDouble :: Value -> Double
-asDouble (Number n) = S.toRealFloat n
-asDouble (String s) =
-  case T.double s of
-    (Right (n, _)) -> n
-    (Left _)       -> error $ "Expected a double, but received: " <> T.unpack s
-asDouble o          = error $ "Expected a double, but received: " <> show o
-
-
-asArray :: Value -> V.Vector Value
-asArray (Array x) = x
-asArray o         = error $ "Expected an array, but received: " <> show o
-
-
--- | Try to extract a Text from Value
---
--- >>> asText (String "foo")
--- "foo"
---
--- >>> asText (Number 10.3)
--- "10.3"
-asText :: Value -> Text
-asText (String t) = t
-asText (Number n) = T.pack $ show n
-asText o          = error $ "Expected a string, but received: " <> show o
-
-
 -- | Create a value getter for an expression
 --
 -- >>> let g = Env (mkStdGen 1) M.empty
@@ -156,23 +98,23 @@ eval (StringLiteral x) = pure $ String x
 eval (FunctionCall "uuid4" []) = String . UUID.toText <$> withStdGen random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
 eval (FunctionCall "randomInt" [lower, upper]) = do
-  lower' <- asInt <$> eval lower
-  upper' <- asInt <$> eval upper
+  lower' <- A.asInt <$> eval lower
+  upper' <- A.asInt <$> eval upper
   Number . fromIntegral <$> withStdGen (randomR (lower', upper'))
 eval (FunctionCall "randomDouble" [lower, upper]) = do
-  lower' <- asDouble <$> eval lower
-  upper' <- asDouble <$> eval upper
+  lower' <- A.asDouble <$> eval lower
+  upper' <- A.asDouble <$> eval upper
   Number . S.fromFloatDigits <$> withStdGen (randomR (lower', upper'))
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
 eval (FunctionCall "oneOf" [arg]) = do
-  arr <- asArray <$> eval arg
+  arr <- A.asArray <$> eval arg
   idx <- withStdGen $ randomR (0, length arr - 1)
   pure $ V.unsafeIndex arr idx
 eval (FunctionCall "oneOf" args) = do
   idx <- withStdGen $ randomR (0, length args - 1)
   eval (args !! idx)
 eval (FunctionCall "replicate" [num, expr]) = do
-  num' <- asInt <$> eval num
+  num' <- A.asInt <$> eval num
   Array <$> V.replicateM num' (eval expr)
 eval (FunctionCall "object" args) = do
   let
@@ -181,12 +123,12 @@ eval (FunctionCall "object" args) = do
     mkPairs [_] = error "Arguments to object must be a multiple of 2 (key + value pairs)"
     mkPairs (x : y : rest) = (x, y) : mkPairs rest
   pairs <- forM keyValuePairs (\(key, val) -> do
-    key' <- asText <$> key
+    key' <- A.asText <$> key
     val' <- val
     pure (key', val'))
   pure $ object pairs
 eval (FunctionCall "fromFile" [fileName]) = do
-  fileName' <- asText <$> eval fileName
+  fileName' <- A.asText <$> eval fileName
   e@Env{..} <- State.get
   case M.lookup fileName' envFileCache of
     (Just lines) -> pure $ Array lines
