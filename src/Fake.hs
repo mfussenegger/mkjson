@@ -23,7 +23,7 @@ import qualified Data.UUID                        as UUID
 import qualified Data.UUID.V1                     as UUID1
 import qualified Data.Vector                      as V
 import           Expr                             (Expr (..))
-import           Prelude                          hiding (lines)
+import           Prelude                          hiding (lines, replicate)
 import           System.Random                    (StdGen, newStdGen, random,
                                                    randomR)
 
@@ -46,7 +46,6 @@ newEnv = do
   pure $ Env stdGen M.empty
 
 
-
 withStdGen :: (StdGen -> (a, StdGen)) -> State a
 withStdGen f = do
   e@Env{..} <- State.get
@@ -63,6 +62,66 @@ uuid1 = do
     (Just u) -> pure u
     Nothing  -> uuid1
 
+
+randomInt :: Expr -> Expr -> State Value
+randomInt lower upper = do
+  lower' <- A.asInt <$> eval lower
+  upper' <- A.asInt <$> eval upper
+  Number . fromIntegral <$> withStdGen (randomR (lower', upper'))
+
+
+randomDouble :: Expr -> Expr -> State Value
+randomDouble lower upper = do
+  lower' <- A.asDouble <$> eval lower
+  upper' <- A.asDouble <$> eval upper
+  Number . S.fromFloatDigits <$> withStdGen (randomR (lower', upper'))
+
+
+oneOfArray :: Expr -> State Value
+oneOfArray arr = do
+  arr' <- A.asArray <$> eval arr
+  idx <- withStdGen $ randomR (0, length arr' - 1)
+  pure $ V.unsafeIndex arr' idx
+
+
+oneOfArgs :: [Expr] -> State Value
+oneOfArgs args = do
+  idx <- withStdGen $ randomR (0, length args - 1)
+  eval (args !! idx)
+
+
+replicate :: Expr -> Expr -> State Value
+replicate num expr = do
+  num' <- A.asInt <$> eval num
+  Array <$> V.replicateM num' (eval expr)
+
+
+objectFromArgs :: [Expr] -> State Value
+objectFromArgs args = do
+  let
+    keyValuePairs = mkPairs (fmap eval args)
+    mkPairs [] = []
+    mkPairs [_] = error "Arguments to object must be a multiple of 2 (key + value pairs)"
+    mkPairs (x : y : rest) = (x, y) : mkPairs rest
+  pairs <- forM keyValuePairs (\(key, val) -> do
+    key' <- A.asText <$> key
+    val' <- val
+    pure (key', val'))
+  pure $ object pairs
+
+
+fromFile :: Expr -> State Value
+fromFile fileName = do
+  fileName' <- A.asText <$> eval fileName
+  e@Env{..} <- State.get
+  case M.lookup fileName' envFileCache of
+    (Just lines) -> pure $ Array lines
+    Nothing      -> do
+      contents <- liftIO $ BS.readFile (T.unpack fileName')
+      let
+        lines = V.fromList $ fmap (String . T.decodeUtf8) (BS.lines contents)
+      State.put e { envFileCache = M.insert fileName' lines envFileCache }
+      pure $ Array lines
 
 -- | Create a value getter for an expression
 --
@@ -94,45 +153,12 @@ eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
 eval (FunctionCall "uuid4" []) = String . UUID.toText <$> withStdGen random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
-eval (FunctionCall "randomInt" [lower, upper]) = do
-  lower' <- A.asInt <$> eval lower
-  upper' <- A.asInt <$> eval upper
-  Number . fromIntegral <$> withStdGen (randomR (lower', upper'))
-eval (FunctionCall "randomDouble" [lower, upper]) = do
-  lower' <- A.asDouble <$> eval lower
-  upper' <- A.asDouble <$> eval upper
-  Number . S.fromFloatDigits <$> withStdGen (randomR (lower', upper'))
+eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
+eval (FunctionCall "randomDouble" [lower, upper]) = randomDouble lower upper
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
-eval (FunctionCall "oneOf" [arg]) = do
-  arr <- A.asArray <$> eval arg
-  idx <- withStdGen $ randomR (0, length arr - 1)
-  pure $ V.unsafeIndex arr idx
-eval (FunctionCall "oneOf" args) = do
-  idx <- withStdGen $ randomR (0, length args - 1)
-  eval (args !! idx)
-eval (FunctionCall "replicate" [num, expr]) = do
-  num' <- A.asInt <$> eval num
-  Array <$> V.replicateM num' (eval expr)
-eval (FunctionCall "object" args) = do
-  let
-    keyValuePairs = mkPairs (fmap eval args)
-    mkPairs [] = []
-    mkPairs [_] = error "Arguments to object must be a multiple of 2 (key + value pairs)"
-    mkPairs (x : y : rest) = (x, y) : mkPairs rest
-  pairs <- forM keyValuePairs (\(key, val) -> do
-    key' <- A.asText <$> key
-    val' <- val
-    pure (key', val'))
-  pure $ object pairs
-eval (FunctionCall "fromFile" [fileName]) = do
-  fileName' <- A.asText <$> eval fileName
-  e@Env{..} <- State.get
-  case M.lookup fileName' envFileCache of
-    (Just lines) -> pure $ Array lines
-    Nothing      -> do
-      contents <- liftIO $ BS.readFile (T.unpack fileName')
-      let
-        lines = V.fromList $ fmap (String . T.decodeUtf8) (BS.lines contents)
-      State.put e { envFileCache = M.insert fileName' lines envFileCache }
-      pure $ Array lines
+eval (FunctionCall "oneOf" [arg]) = oneOfArray arg
+eval (FunctionCall "oneOf" args) = oneOfArgs args
+eval (FunctionCall "replicate" [num, expr]) = replicate num expr
+eval (FunctionCall "object" args) = objectFromArgs args
+eval (FunctionCall "fromFile" [fileName]) = fromFile fileName
 eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
