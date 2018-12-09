@@ -10,6 +10,16 @@ jobs:
       - script: stack test
         displayName: Run tests
 
+  - job: MacOSTest
+    pool:
+      vmImage: 'macOS-10.13'
+    steps:
+      - script: curl -sSL https://get.haskellstack.org/ | sh
+        displayName: Install stack
+
+      - script: stack test
+        displayName: Run tests
+
   - job: WindowsTest
     pool:
       vmImage: 'VS2017-Win2016'
