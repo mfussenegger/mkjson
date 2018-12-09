@@ -59,4 +59,5 @@ tests:
     source-dirs: tests
     dependencies:
       - fake-json
+      - Glob
       - doctest
