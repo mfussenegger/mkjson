@@ -162,7 +162,7 @@ fromFile fileName = do
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
-eval (DoubleLiteral x) = pure $ Number $ S.fromFloatDigits x
+eval (DoubleLiteral x) = pure $ Number x
 eval (FunctionCall "uuid4" []) = String . UUID.toText <$> withStdGen random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
 eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper

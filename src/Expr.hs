@@ -3,12 +3,13 @@
 module Expr where
 
 import           Data.Maybe        (fromMaybe)
+import           Data.Scientific   (Scientific)
 import           Data.String       (IsString (..))
 import           Data.Text         (Text)
 import qualified Data.Text         as T
-import           Text.Parsec       (many, many1, optionMaybe, parse,
-                                    sepBy, (<|>))
-import           Text.Parsec.Char  (char, digit, letter, spaces, noneOf)
+import           Text.Parsec       (many, many1, optionMaybe, parse, sepBy,
+                                    (<|>))
+import           Text.Parsec.Char  (char, digit, letter, noneOf, spaces)
 import           Text.Parsec.Error (ParseError)
 import           Text.Parsec.Text  (Parser)
 
@@ -16,7 +17,7 @@ import           Text.Parsec.Text  (Parser)
 -- >>> :set -XOverloadedStrings
 
 data Expr = IntLiteral Integer
-          | DoubleLiteral Double
+          | DoubleLiteral Scientific
           | StringLiteral Text
           | FunctionCall { fcName :: Text, fcArgs :: [Expr] }
           deriving (Show, Eq)
@@ -46,7 +47,6 @@ number = do
     (Just _) -> do
       fractional <- many digit
       let
-        value :: Double
         value = read $ integer <> "." <> fractional
       pure $ DoubleLiteral value
 
