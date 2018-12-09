@@ -161,4 +161,4 @@ eval (FunctionCall "oneOf" args) = oneOfArgs args
 eval (FunctionCall "replicate" [num, expr]) = replicate num expr
 eval (FunctionCall "object" args) = objectFromArgs args
 eval (FunctionCall "fromFile" [fileName]) = fromFile fileName
-eval (FunctionCall name _) = pure $ String $ "No random generator for " <> name
+eval (FunctionCall name _) = error $ "No random generator for " <> T.unpack name
