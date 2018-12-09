@@ -87,6 +87,14 @@ randomDouble lower upper = do
   Number . S.fromFloatDigits <$> withStdGen (randomR (lower', upper'))
 
 
+-- | Generate a random boolean
+--
+-- >>> exec "randomBool"
+-- Bool True
+randomBool :: State Value
+randomBool = Bool <$> withStdGen random
+
+
 -- | Select one random item of an array
 --
 -- >>> exec "oneOf(array(37, 42, 21))"
@@ -166,6 +174,7 @@ eval (DoubleLiteral x) = pure $ Number x
 eval (FunctionCall "uuid4" []) = String . UUID.toText <$> withStdGen random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
 eval (FunctionCall "null" []) = pure Null
+eval (FunctionCall "randomBool" []) = randomBool
 eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
 eval (FunctionCall "randomDouble" [lower, upper]) = randomDouble lower upper
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args

@@ -20,6 +20,7 @@ a field within the JSON object.
  - uuid1
  - uuid4
  - null
+ - randomBool
  - randomInt(lower, upper)
  - randomDouble(lower, upper)
  - array(expr [, ...])
