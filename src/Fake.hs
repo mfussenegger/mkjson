@@ -31,6 +31,8 @@ import           System.Random                    (StdGen, newStdGen, random,
 -- $setup
 -- >>> :set -XOverloadedStrings
 -- >>> import System.Random (mkStdGen)
+-- >>> let g = Env (mkStdGen 1) M.empty
+-- >>> let exec expr = State.evalStateT (eval expr) g
 
 
 type State a = StateT Env IO a
@@ -63,6 +65,10 @@ uuid1 = do
     Nothing  -> uuid1
 
 
+-- | Generate a random int
+--
+-- >>> exec "randomInt(1, 2)"
+-- Number 2.0
 randomInt :: Expr -> Expr -> State Value
 randomInt lower upper = do
   lower' <- A.asInt <$> eval lower
@@ -70,6 +76,10 @@ randomInt lower upper = do
   Number . fromIntegral <$> withStdGen (randomR (lower', upper'))
 
 
+-- | Generate a random double
+--
+-- >>> exec "randomDouble(1, 3)"
+-- Number 1.1555807501666868
 randomDouble :: Expr -> Expr -> State Value
 randomDouble lower upper = do
   lower' <- A.asDouble <$> eval lower
@@ -77,25 +87,43 @@ randomDouble lower upper = do
   Number . S.fromFloatDigits <$> withStdGen (randomR (lower', upper'))
 
 
+-- | Select one random item of an array
+--
+-- >>> exec "oneOf(array(37, 42, 21))"
+-- Number 21.0
 oneOfArray :: Expr -> State Value
 oneOfArray arr = do
   arr' <- A.asArray <$> eval arr
   idx <- withStdGen $ randomR (0, length arr' - 1)
-  pure $ V.unsafeIndex arr' idx
+  pure $ arr' V.! idx
 
 
+-- | Select one random argument
+--
+-- >>> exec "oneOf(37, 42, 21)"
+-- Number 21.0
 oneOfArgs :: [Expr] -> State Value
 oneOfArgs args = do
   idx <- withStdGen $ randomR (0, length args - 1)
   eval (args !! idx)
 
 
+-- | Create an array with `num` items
+--
+-- >>> exec "replicate(randomInt(2, 4), oneOf(37, 42, 21))"
+-- Array [Number 42.0,Number 42.0,Number 21.0,Number 42.0]
+--
 replicate :: Expr -> Expr -> State Value
 replicate num expr = do
   num' <- A.asInt <$> eval num
   Array <$> V.replicateM num' (eval expr)
 
 
+-- | Create an object from a list in the  [key, value [, ...]] form
+--
+-- >>> exec "object('x', randomInt(2, 4), oneOf('y', 'z'), 3)"
+-- Object (fromList [("x",Number 4.0),("y",Number 3.0)])
+-- 
 objectFromArgs :: [Expr] -> State Value
 objectFromArgs args = do
   let
@@ -125,29 +153,12 @@ fromFile fileName = do
 
 -- | Create a value getter for an expression
 --
--- >>> let g = Env (mkStdGen 1) M.empty
--- >>> let exec expr = State.evalStateT (eval expr) g
---
--- >>> exec "randomInt(1, 2)"
--- Number 2.0
---
 -- >>> exec "uuid4"
 -- String "0099a82c-36f7-4321-8012-daa4305fd84b"
 --
 -- >>> exec "array(randomInt(1, 10), randomDouble(1, 20))"
 -- Array [Number 6.0,Number 14.108305934824038]
 --
--- >>> exec "oneOf(array(37, 42, 21))"
--- Number 21.0
---
--- >>> exec "oneOf(37, 42, 21)"
--- Number 21.0
---
--- >>> exec "replicate(randomInt(2, 4), oneOf(37, 42, 21))"
--- Array [Number 42.0,Number 42.0,Number 21.0,Number 42.0]
---
--- >>> exec "object('x', randomInt(2, 4), oneOf('y', 'z'), 3)"
--- Object (fromList [("x",Number 4.0),("y",Number 3.0)])
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
