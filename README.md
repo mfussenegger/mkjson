@@ -1,5 +1,7 @@
 # fake-json
 
+[![Build status](https://dev.azure.com/mfussenegger/fake-json/_apis/build/status/fake-json-CI?branchName=master)](https://dev.azure.com/mfussenegger/fake-json/_build/latest?definitionId=2)
+
 `fake-json` is a CLI to generate random JSON records. If invoked it will
 generate and print 1 JSON object per line until cancelled:
 
