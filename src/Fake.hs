@@ -6,17 +6,20 @@ module Fake (
   Env(..),
   newEnv,
   eval,
+  runExpr
 ) where
 
 import qualified Aeson                            as A
-import           Control.Monad                    (forM)
+import           Control.Monad                    (forM, replicateM)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import           Data.Aeson                       (Value (..), object)
 import qualified Data.ByteString.Char8            as BS
 import qualified Data.HashMap.Strict              as M
+import           Data.Maybe                       (fromMaybe)
 import qualified Data.Scientific                  as S
+import qualified Data.Set                         as Set
 import qualified Data.Text                        as T
 import qualified Data.Text.Encoding               as T
 import qualified Data.UUID                        as UUID
@@ -24,13 +27,14 @@ import qualified Data.UUID.V1                     as UUID1
 import qualified Data.Vector                      as V
 import           Expr                             (Expr (..))
 import           Prelude                          hiding (lines, replicate)
-import           System.Random                    (StdGen, newStdGen, random,
-                                                   randomR)
+import           System.Random                    (StdGen, mkStdGen, newStdGen,
+                                                   random, randomR)
+import qualified Text.Regex.TDFA.Pattern          as R
+import qualified Text.Regex.TDFA.ReadRegex        as R
 
 
 -- $setup
 -- >>> :set -XOverloadedStrings
--- >>> import System.Random (mkStdGen)
 -- >>> let g = Env (mkStdGen 1) M.empty
 -- >>> let exec expr = State.evalStateT (eval expr) g
 
@@ -40,6 +44,12 @@ type State a = StateT Env IO a
 data Env = Env
   { envStdGen :: StdGen
   , envFileCache :: M.HashMap T.Text (V.Vector Value) }
+
+
+runExpr :: Int -> Expr -> IO Value
+runExpr seed expr = State.evalStateT (eval expr) env
+  where
+    env = Env (mkStdGen seed) M.empty
 
 
 newEnv :: IO Env
@@ -111,9 +121,7 @@ oneOfArray arr = do
 -- >>> exec "oneOf(37, 42, 21)"
 -- Number 21.0
 oneOfArgs :: [Expr] -> State Value
-oneOfArgs args = do
-  idx <- withStdGen $ randomR (0, length args - 1)
-  eval (args !! idx)
+oneOfArgs args = rndListItem args >>= eval
 
 
 -- | Create an array with `num` items
@@ -144,6 +152,66 @@ objectFromArgs args = do
     val' <- val
     pure (key', val'))
   pure $ object pairs
+
+
+rndListItem :: [a] -> State a
+rndListItem xs = do
+  idx <- withStdGen $ randomR (0, length xs - 1)
+  pure $ xs !! idx
+
+
+rndSetItem :: Set.Set a -> State a
+rndSetItem xs = do
+  idx <- withStdGen $ randomR (0, Set.size xs - 1)
+  pure $ Set.elemAt idx xs
+
+
+allPossibleChars :: Set.Set Char
+allPossibleChars = Set.fromList [minBound..maxBound]
+
+
+-- | Create random data that would be matched by the given regex
+--
+-- >>> exec "fromRegex('\\d-\\d{1,3}-FOO')"
+-- String "6-78-FOO"
+--
+-- >>> exec "fromRegex('[a-z]{3}')"
+-- String "vjy"
+--
+-- >>> exec "fromRegex('[^0-9][0-9]B')"
+-- String "\27960\&5B"
+fromRegex :: T.Text -> State Value
+fromRegex input =
+  case R.parseRegex input' of
+    (Left err)           -> error $ show err
+    (Right (pattern, _)) -> String <$> generateText pattern
+  where
+    input' = T.unpack input
+    defaultUpper = 10
+    replicatePattern lower upper pattern = do
+      numChars <- withStdGen $ randomR (lower, upper)
+      T.concat <$> replicateM numChars (generateText pattern)
+    generateText p = case p of
+      (R.POr patterns) -> rndListItem patterns >>= generateText
+      (R.PConcat patterns) -> T.concat <$> mapM generateText patterns
+      (R.PPlus pattern) -> replicatePattern 1 defaultUpper pattern
+      (R.PStar _ pattern) -> replicatePattern 0 defaultUpper pattern
+      (R.PBound lower mUpper pattern) -> do
+        replicatePattern lower (fromMaybe defaultUpper mUpper) pattern
+      (R.PAny _ patternSet) -> fromPatternSet patternSet
+      (R.PAnyNot _ ps@(R.PatternSet mChars _ _ _)) -> case mChars of
+        (Just notAllowedChars) ->
+          charToText <$> rndSetItem (Set.difference allPossibleChars notAllowedChars)
+        Nothing -> error $ "Can't generate data from regex pattern" <> show ps
+      (R.PEscape _ 'd') -> do
+        T.pack . show <$> (withStdGen $ randomR (0, 9 :: Int))
+      (R.PChar _ char) -> pure $ charToText char
+      _ -> error $ "Can't generate data from regex pattern" <> show p
+    fromPatternSet ps@(R.PatternSet mCharSet _ _ _) =
+      case mCharSet of
+        (Just charSet) -> charToText <$> rndSetItem charSet
+        Nothing -> error $ "Can't generate data from regex pattern" <> show ps
+    charToText c = T.pack [c]
 
 
 fromFile :: Expr -> State Value
@@ -183,4 +251,5 @@ eval (FunctionCall "oneOf" args) = oneOfArgs args
 eval (FunctionCall "replicate" [num, expr]) = replicate num expr
 eval (FunctionCall "object" args) = objectFromArgs args
 eval (FunctionCall "fromFile" [fileName]) = fromFile fileName
+eval (FunctionCall "fromRegex" [pattern]) = eval pattern >>= fromRegex . A.asText
 eval (FunctionCall name _) = error $ "No random generator for " <> T.unpack name

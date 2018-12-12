@@ -31,6 +31,8 @@ dependencies:
   - transformers
   - vector
   - unordered-containers
+  - containers
+  - regex-tdfa
 
 library:
   source-dirs: src

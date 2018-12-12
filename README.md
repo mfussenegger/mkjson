@@ -29,6 +29,7 @@ a field within the JSON object.
  - replicate(number, expr)
  - object(key, value [, ...])
  - fromFile(fileName)
+ - fromRegex(pattern)
 
 
 ## Installation
