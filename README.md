@@ -21,6 +21,7 @@ a field within the JSON object.
  - uuid4
  - null
  - randomBool
+ - randomChar
  - randomInt(lower, upper)
  - randomDouble(lower, upper)
  - array(expr [, ...])
