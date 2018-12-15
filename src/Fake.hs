@@ -58,7 +58,7 @@ newEnv = do
   pure $ Env stdGen M.empty
 
 
-withStdGen :: (StdGen -> (a, StdGen)) -> State a
+withStdGen :: Monad m => (StdGen -> (a, StdGen)) -> StateT Env m a
 withStdGen f = do
   e@Env{..} <- State.get
   let
@@ -67,9 +67,9 @@ withStdGen f = do
   pure x
 
 
-uuid1 :: State UUID.UUID
+uuid1 :: IO UUID.UUID
 uuid1 = do
-  uuid <- liftIO UUID1.nextUUID
+  uuid <- UUID1.nextUUID
   case uuid of
     (Just u) -> pure u
     Nothing  -> uuid1
@@ -101,7 +101,7 @@ randomDouble lower upper = do
 --
 -- >>> exec "randomBool"
 -- Bool True
-randomBool :: State Value
+randomBool :: Monad m => StateT Env m Value
 randomBool = Bool <$> withStdGen random
 
 
@@ -154,13 +154,13 @@ objectFromArgs args = do
   pure $ object pairs
 
 
-rndListItem :: [a] -> State a
+rndListItem :: Monad m => [a] -> StateT Env m a
 rndListItem xs = do
   idx <- withStdGen $ randomR (0, length xs - 1)
   pure $ xs !! idx
 
 
-rndSetItem :: Set.Set a -> State a
+rndSetItem :: Monad m => Set.Set a -> StateT Env m a
 rndSetItem xs = do
   idx <- withStdGen $ randomR (0, Set.size xs - 1)
   pure $ Set.elemAt idx xs
@@ -180,7 +180,7 @@ allPossibleChars = Set.fromList [minBound..maxBound]
 --
 -- >>> exec "fromRegex('[^0-9][0-9]B')"
 -- String "\27960\&5B"
-fromRegex :: T.Text -> State Value
+fromRegex :: Monad m => T.Text -> StateT Env m Value
 fromRegex input =
   case R.parseRegex input' of
     (Left err)           -> error $ show err
@@ -232,7 +232,7 @@ fromFile fileName = do
 --
 -- >>> exec "randomChar()"
 -- String "\39335"
-randomChar :: State Value
+randomChar :: Monad m => StateT Env m Value
 randomChar = charToString <$> rndSetItem allPossibleChars 
   where
     charToString = String . T.pack . (: [])
@@ -250,7 +250,7 @@ eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
 eval (DoubleLiteral x) = pure $ Number x
 eval (FunctionCall "uuid4" []) = String . UUID.toText <$> withStdGen random
-eval (FunctionCall "uuid1" []) = String . UUID.toText <$> uuid1
+eval (FunctionCall "uuid1" []) = String . UUID.toText <$> liftIO uuid1
 eval (FunctionCall "null" []) = pure Null
 eval (FunctionCall "randomBool" []) = randomBool
 eval (FunctionCall "randomChar" []) = randomChar
