@@ -9,29 +9,29 @@ module Fake (
   runExpr
 ) where
 
-import qualified Aeson                            as A
-import           Control.Monad                    (forM, replicateM)
-import           Control.Monad.IO.Class           (liftIO)
-import           Control.Monad.Trans.State.Strict (StateT)
-import qualified Control.Monad.Trans.State.Strict as State
-import           Data.Aeson                       (Value (..), object)
-import qualified Data.ByteString.Char8            as BS
-import qualified Data.HashMap.Strict              as M
-import           Data.Maybe                       (fromMaybe)
-import qualified Data.Scientific                  as S
-import qualified Data.Set                         as Set
-import qualified Data.Text                        as T
-import qualified Data.Text.Encoding               as T
-import qualified Data.UUID                        as UUID
-import qualified Data.UUID.V1                     as UUID1
-import qualified Data.Vector                      as V
-import           Expr                             (Expr (..))
-import           Prelude                          hiding (lines, replicate)
-import           System.Random                    (RandomGen (..), StdGen,
-                                                   mkStdGen, newStdGen, random,
-                                                   randomR)
-import qualified Text.Regex.TDFA.Pattern          as R
-import qualified Text.Regex.TDFA.ReadRegex        as R
+import qualified Aeson                      as A
+import           Control.Monad              (forM, replicateM)
+import           Control.Monad.IO.Class     (liftIO)
+import           Control.Monad.State.Class  (MonadState)
+import           Control.Monad.State.Strict (StateT)
+import qualified Control.Monad.State.Strict as State
+import           Data.Aeson                 (Value (..), object)
+import qualified Data.ByteString.Char8      as BS
+import qualified Data.HashMap.Strict        as M
+import           Data.Maybe                 (fromMaybe)
+import qualified Data.Scientific            as S
+import qualified Data.Set                   as Set
+import qualified Data.Text                  as T
+import qualified Data.Text.Encoding         as T
+import qualified Data.UUID                  as UUID
+import qualified Data.UUID.V1               as UUID1
+import qualified Data.Vector                as V
+import           Expr                       (Expr (..))
+import           Prelude                    hiding (lines, replicate)
+import           System.Random              (Random (..), RandomGen (..),
+                                             StdGen, mkStdGen, newStdGen)
+import qualified Text.Regex.TDFA.Pattern    as R
+import qualified Text.Regex.TDFA.ReadRegex  as R
 
 
 -- $setup
@@ -122,8 +122,16 @@ oneOfArray arr = do
 --
 -- >>> exec "oneOf(37, 42, 21)"
 -- Number 21.0
-oneOfArgs :: [Expr] -> State Value
-oneOfArgs args = rndListItem args >>= eval
+--
+-- >>> env <- newEnv
+-- >>> State.evalStateT (oneOfArgs []) env
+-- Nothing
+oneOfArgs :: [Expr] -> State (Maybe Value)
+oneOfArgs args = do
+  rndArg <- rndListItem args
+  case rndArg of
+    Nothing  -> pure Nothing
+    Just arg -> Just <$> eval arg
 
 
 -- | Create an array with `num` items
@@ -156,10 +164,11 @@ objectFromArgs args = do
   pure $ object pairs
 
 
-rndListItem :: Monad m => [a] -> StateT Env m a
+rndListItem :: (RandomGen g, MonadState g m) => [a] -> m (Maybe a)
+rndListItem [] = pure Nothing
 rndListItem xs = do
   idx <- State.state $ randomR (0, length xs - 1)
-  pure $ xs !! idx
+  pure . Just $ xs !! idx
 
 
 rndSetItem :: Monad m => Set.Set a -> StateT Env m a
@@ -194,7 +203,11 @@ fromRegex input =
       numChars <- State.state $ randomR (lower, upper)
       T.concat <$> replicateM numChars (generateText pattern)
     generateText p = case p of
-      (R.POr patterns) -> rndListItem patterns >>= generateText
+      (R.POr patterns) -> do
+        pattern <- rndListItem patterns
+        case pattern of
+          Nothing       -> pure $ ""
+          Just pattern' -> generateText pattern'
       (R.PConcat patterns) -> T.concat <$> mapM generateText patterns
       (R.PPlus pattern) -> replicatePattern 1 defaultUpper pattern
       (R.PStar _ pattern) -> replicatePattern 0 defaultUpper pattern
@@ -240,6 +253,13 @@ randomChar = charToString <$> State.state random
     charToString :: Char -> Value
     charToString = String . T.pack . (: [])
 
+maybeFail :: Monad m => String -> m (Maybe a) -> m a
+maybeFail err x  = do
+  x' <- x
+  case x' of
+    Nothing  -> error err
+    Just x'' -> pure x''
+
 -- | Create a value getter for an expression
 --
 -- >>> exec "uuid4"
@@ -261,7 +281,8 @@ eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
 eval (FunctionCall "randomDouble" [lower, upper]) = randomDouble lower upper
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
 eval (FunctionCall "oneOf" [arg]) = oneOfArray arg
-eval (FunctionCall "oneOf" args) = oneOfArgs args
+eval (FunctionCall "oneOf" args) =
+  maybeFail "oneOf requires at least 1 argument" (oneOfArgs args)
 eval (FunctionCall "replicate" [num, expr]) = replicate num expr
 eval (FunctionCall "object" args) = objectFromArgs args
 eval (FunctionCall "fromFile" [fileName]) = fromFile fileName

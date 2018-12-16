@@ -28,7 +28,7 @@ dependencies:
   - parsec
   - random
   - scientific
-  - transformers
+  - mtl
   - vector
   - unordered-containers
   - containers

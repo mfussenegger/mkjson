@@ -3,18 +3,18 @@
 module Main where
 
 
-import           Control.Monad                    (forever)
-import           Control.Monad.IO.Class           (liftIO)
-import qualified Control.Monad.Trans.State.Strict as State
-import           Data.Aeson                       (encode, object)
-import qualified Data.ByteString.Lazy.Char8       as BL
-import           Data.Either                      (isRight, lefts)
-import           Data.Maybe                       (mapMaybe)
-import           Data.Text                        (Text)
-import qualified Data.Text                        as T
-import           Expr                             (parseExpr)
-import           Fake                             (eval, newEnv)
-import           System.Environment               (getArgs)
+import           Control.Monad              (forever)
+import           Control.Monad.IO.Class     (liftIO)
+import qualified Control.Monad.State.Strict as State
+import           Data.Aeson                 (encode, object)
+import qualified Data.ByteString.Lazy.Char8 as BL
+import           Data.Either                (isRight, lefts)
+import           Data.Maybe                 (mapMaybe)
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           Expr                       (parseExpr)
+import           Fake                       (eval, newEnv)
+import           System.Environment         (getArgs)
 
 parseColumnDefinition :: String -> Maybe (Text, Text)
 parseColumnDefinition x =
