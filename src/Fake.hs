@@ -167,7 +167,7 @@ rndListItem xs = do
   pure . Just $ xs !! idx
 
 
-rndSetItem :: Monad m => Set.Set a -> StateT Env m a
+rndSetItem :: (RandomGen g, MonadState g m) => Set.Set a -> m a
 rndSetItem xs = do
   idx <- State.state $ randomR (0, Set.size xs - 1)
   pure $ Set.elemAt idx xs
@@ -187,11 +187,11 @@ allPossibleChars = Set.fromList [minBound..maxBound]
 --
 -- >>> exec "fromRegex('[^0-9][0-9]B')"
 -- String "\211735\&4B"
-fromRegex :: Monad m => T.Text -> StateT Env m Value
+fromRegex :: (RandomGen g, MonadState g m) => T.Text -> m T.Text
 fromRegex input =
   case R.parseRegex input' of
-    (Left err)           -> error $ show err
-    (Right (pattern, _)) -> String <$> generateText pattern
+    Right (pattern, _) -> generateText pattern
+    Left err           -> error $ show err
   where
     input' = T.unpack input
     defaultUpper = 10
@@ -282,5 +282,5 @@ eval (FunctionCall "oneOf" args) =
 eval (FunctionCall "replicate" [num, expr]) = replicate num expr
 eval (FunctionCall "object" args) = objectFromArgs args
 eval (FunctionCall "fromFile" [fileName]) = fromFile fileName
-eval (FunctionCall "fromRegex" [pattern]) = eval pattern >>= fromRegex . A.asText
+eval (FunctionCall "fromRegex" [pattern]) = String <$> (eval pattern >>= fromRegex . A.asText)
 eval (FunctionCall name _) = error $ "No random generator for " <> T.unpack name
