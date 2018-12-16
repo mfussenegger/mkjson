@@ -184,14 +184,21 @@ rndListItem xs = do
   pure . Just $ xs !! idx
 
 
-rndSetItem :: (RandomGen g, MonadState g m) => Set.Set a -> m a
-rndSetItem xs = do
-  idx <- State.state $ randomR (0, Set.size xs - 1)
-  pure $ Set.elemAt idx xs
+rndSetItem :: (RandomGen g, MonadState g m) => Set.Set a -> m (Maybe a)
+rndSetItem xs
+  | Set.null xs = pure Nothing
+  | otherwise   = do
+    idx <- State.state $ randomR (0, Set.size xs - 1)
+    pure . Just $ Set.elemAt idx xs
 
 
 allPossibleChars :: Set.Set Char
 allPossibleChars = Set.fromList [minBound..maxBound]
+
+
+maybeMErr :: MonadError b m => b -> Maybe a -> m a
+maybeMErr err Nothing  = Except.throwError err
+maybeMErr _   (Just x) = pure x
 
 
 -- | Create random data that would be matched by the given regex
@@ -229,18 +236,18 @@ fromRegex input =
       (R.PBound lower mUpper pattern) -> do
         replicatePattern lower (fromMaybe defaultUpper mUpper) pattern
       (R.PAny _ patternSet) -> fromPatternSet patternSet
-      (R.PAnyNot _ ps@(R.PatternSet mChars _ _ _)) -> case mChars of
-        (Just notAllowedChars) ->
-          charToText <$> rndSetItem (Set.difference allPossibleChars notAllowedChars)
-        Nothing -> Except.throwError $ "Can't generate data from regex pattern" <> show ps
+      (R.PAnyNot _ ps@(R.PatternSet mChars _ _ _)) -> do
+        rndSetItem (maybe Set.empty (Set.difference allPossibleChars) mChars)
+        >>= maybeMErr ("Can't generate data from regex pattern" <> show ps)
+        <&> charToText
       (R.PEscape _ 'd') -> do
         T.pack . show <$> (State.state $ randomR (0, 9 :: Int))
       (R.PChar _ char) -> pure $ charToText char
       _ -> Except.throwError $ "Can't generate data from regex pattern" <> show p
-    fromPatternSet ps@(R.PatternSet mCharSet _ _ _) =
-      case mCharSet of
-        (Just charSet) -> charToText <$> rndSetItem charSet
-        Nothing -> Except.throwError $ "Can't generate data from regex pattern" <> show ps
+    fromPatternSet ps@(R.PatternSet mCharSet _ _ _) = do
+      rndSetItem (fromMaybe Set.empty mCharSet)
+      >>= maybeMErr ("Can't generate data from regex pattern" <> show ps)
+      <&> charToText
     charToText c = T.pack [c]
 
 
