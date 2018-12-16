@@ -11,7 +11,7 @@ module Fake (
 ) where
 
 import qualified Aeson                      as A
-import           Control.Monad              (forM, replicateM)
+import           Control.Monad              (replicateM)
 import           Control.Monad.Except       (ExceptT, MonadError)
 import qualified Control.Monad.Except       as Except
 import           Control.Monad.IO.Class     (MonadIO, liftIO)
@@ -164,15 +164,17 @@ replicate num expr = do
 objectFromArgs :: [Expr] -> Fake Value
 objectFromArgs args = do
   let
-    keyValuePairs = mkPairs (fmap eval args)
-    mkPairs [] = []
-    mkPairs [_] = error "Arguments to object must be a multiple of 2 (key + value pairs)"
-    mkPairs (x : y : rest) = (x, y) : mkPairs rest
-  pairs <- forM keyValuePairs (\(key, val) -> do
-    key' <- Except.liftEither =<< A.asText <$> key
-    val' <- val
-    pure (key', val'))
-  pure $ object pairs
+    pairs = fmap (fmap mkKeyValuePair) (mkPairs args)
+  Except.liftEither pairs >>= mapM id <&> object
+  where
+    mkPairs [] = Right []
+    mkPairs [_] = Left "Arguments to object must be a multiple of 2 (key + value pairs)"
+    mkPairs (x : y : rest) = ((x, y) :) <$> mkPairs rest
+    mkKeyValuePair :: (Expr, Expr) -> Fake (T.Text, Value)
+    mkKeyValuePair (key, val) = do
+      key' <- eval key <&> A.asText >>= Except.liftEither
+      val' <- eval val
+      pure (key', val')
 
 
 rndListItem :: (RandomGen g, MonadState g m) => [a] -> m (Maybe a)
@@ -295,5 +297,5 @@ eval (FunctionCall "fromRegex" [pattern]) =
   <&> A.asText
   >>= Except.liftEither
   >>= fromRegex
-  <&> String
-eval (FunctionCall name _) = error $ "No random generator for " <> T.unpack name
+  <&>  String
+eval (FunctionCall name _) = Except.throwError $ "No random generator for " <> T.unpack name
