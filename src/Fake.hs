@@ -204,11 +204,13 @@ allPossibleChars = Set.fromList [minBound..maxBound]
 --
 -- >>> exec "fromRegex('[^0-9][0-9]B')"
 -- String "\211735\&4B"
-fromRegex :: (RandomGen g, MonadState g m) => T.Text -> m T.Text
+fromRegex :: (RandomGen g, MonadState g m, MonadError String m)
+          => T.Text
+          -> m T.Text
 fromRegex input =
   case R.parseRegex input' of
     Right (pattern, _) -> generateText pattern
-    Left err           -> error $ show err
+    Left err           -> Except.throwError $ show err
   where
     input' = T.unpack input
     defaultUpper = 10
@@ -230,15 +232,15 @@ fromRegex input =
       (R.PAnyNot _ ps@(R.PatternSet mChars _ _ _)) -> case mChars of
         (Just notAllowedChars) ->
           charToText <$> rndSetItem (Set.difference allPossibleChars notAllowedChars)
-        Nothing -> error $ "Can't generate data from regex pattern" <> show ps
+        Nothing -> Except.throwError $ "Can't generate data from regex pattern" <> show ps
       (R.PEscape _ 'd') -> do
         T.pack . show <$> (State.state $ randomR (0, 9 :: Int))
       (R.PChar _ char) -> pure $ charToText char
-      _ -> error $ "Can't generate data from regex pattern" <> show p
+      _ -> Except.throwError $ "Can't generate data from regex pattern" <> show p
     fromPatternSet ps@(R.PatternSet mCharSet _ _ _) =
       case mCharSet of
         (Just charSet) -> charToText <$> rndSetItem charSet
-        Nothing -> error $ "Can't generate data from regex pattern" <> show ps
+        Nothing -> Except.throwError $ "Can't generate data from regex pattern" <> show ps
     charToText c = T.pack [c]
 
 
@@ -296,6 +298,6 @@ eval (FunctionCall "fromRegex" [pattern]) =
   eval pattern
   <&> A.asText
   >>= Except.liftEither
-  >>= fromRegex
-  <&>  String
+  >>= (Fake . fromRegex)
+  <&> String
 eval (FunctionCall name _) = Except.throwError $ "No random generator for " <> T.unpack name
