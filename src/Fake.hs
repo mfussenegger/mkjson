@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Fake (
   State,
@@ -133,13 +134,14 @@ oneOfArray arr = do
 -- Number 21.0
 --
 -- >>> runFakeT Nothing (oneOfArgs [])
--- Nothing
-oneOfArgs :: [Expr] -> Fake (Maybe Value)
+-- *** Exception: At least 1 argument required
+-- ...
+oneOfArgs :: [Expr] -> Fake Value
 oneOfArgs args = do
   rndArg <- rndListItem args
   case rndArg of
-    Nothing  -> pure Nothing
-    Just arg -> Just <$> eval arg
+    Nothing  -> Except.throwError "At least 1 argument required"
+    Just arg -> eval arg
 
 
 -- | Create an array with `num` items
@@ -261,12 +263,6 @@ randomChar = charToString <$> State.state random
     charToString :: Char -> Value
     charToString = String . T.pack . (: [])
 
-maybeFail :: Monad m => String -> m (Maybe a) -> m a
-maybeFail err x  = do
-  x' <- x
-  case x' of
-    Nothing  -> error err
-    Just x'' -> pure x''
 
 -- | Create a value getter for an expression
 --
@@ -289,8 +285,7 @@ eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
 eval (FunctionCall "randomDouble" [lower, upper]) = randomDouble lower upper
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
 eval (FunctionCall "oneOf" [arg]) = oneOfArray arg
-eval (FunctionCall "oneOf" args) =
-  maybeFail "oneOf requires at least 1 argument" (oneOfArgs args)
+eval (FunctionCall "oneOf" args) = oneOfArgs args
 eval (FunctionCall "replicate" [num, expr]) = replicate num expr
 eval (FunctionCall "object" args) = objectFromArgs args
 eval (FunctionCall "fromFile" [fileName]) = fromFile fileName
