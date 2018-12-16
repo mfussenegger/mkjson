@@ -20,6 +20,7 @@ import           Control.Monad.State.Strict (StateT)
 import qualified Control.Monad.State.Strict as State
 import           Data.Aeson                 (Value (..), object)
 import qualified Data.ByteString.Char8      as BS
+import           Data.Functor               ((<&>))
 import qualified Data.HashMap.Strict        as M
 import           Data.Maybe                 (fromMaybe)
 import qualified Data.Scientific            as S
@@ -123,7 +124,7 @@ randomBool = Bool <$> State.state random
 -- Number 21.0
 oneOfArray :: Expr -> Fake Value
 oneOfArray arr = do
-  arr' <- A.asArray <$> eval arr
+  arr' <- Except.liftEither =<< A.asArray <$> eval arr
   idx <- State.state $ randomR (0, length arr' - 1)
   pure $ arr' V.! idx
 
@@ -168,7 +169,7 @@ objectFromArgs args = do
     mkPairs [_] = error "Arguments to object must be a multiple of 2 (key + value pairs)"
     mkPairs (x : y : rest) = (x, y) : mkPairs rest
   pairs <- forM keyValuePairs (\(key, val) -> do
-    key' <- A.asText <$> key
+    key' <- Except.liftEither =<< A.asText <$> key
     val' <- val
     pure (key', val'))
   pure $ object pairs
@@ -241,7 +242,7 @@ fromRegex input =
 
 fromFile :: Expr -> Fake Value
 fromFile fileName = do
-  fileName' <- A.asText <$> eval fileName
+  fileName' <- Except.liftEither =<< A.asText <$> eval fileName
   e@Env{..} <- State.get
   case M.lookup fileName' envFileCache of
     (Just lines) -> pure $ Array lines
@@ -289,5 +290,10 @@ eval (FunctionCall "oneOf" args) = oneOfArgs args
 eval (FunctionCall "replicate" [num, expr]) = replicate num expr
 eval (FunctionCall "object" args) = objectFromArgs args
 eval (FunctionCall "fromFile" [fileName]) = fromFile fileName
-eval (FunctionCall "fromRegex" [pattern]) = String <$> (eval pattern >>= fromRegex . A.asText)
+eval (FunctionCall "fromRegex" [pattern]) =
+  eval pattern
+  <&> A.asText
+  >>= Except.liftEither
+  >>= fromRegex
+  <&> String
 eval (FunctionCall name _) = error $ "No random generator for " <> T.unpack name

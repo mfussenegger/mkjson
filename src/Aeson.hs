@@ -53,19 +53,19 @@ asDouble (String s) =
 asDouble o          = Left $ "Expected a double, but received: " <> show o
 
 
-asArray :: Value -> V.Vector Value
-asArray (Array x) = x
-asArray o         = error $ "Expected an array, but received: " <> show o
+asArray :: Value -> Either String (V.Vector Value)
+asArray (Array x) = Right x
+asArray o         = Left $ "Expected an array, but received: " <> show o
 
 
 -- | Try to extract a Text from Value
 --
 -- >>> asText (String "foo")
--- "foo"
+-- Right "foo"
 --
 -- >>> asText (Number 10.3)
--- "10.3"
-asText :: Value -> T.Text
-asText (String t) = t
-asText (Number n) = T.pack $ show n
-asText o          = error $ "Expected a string, but received: " <> show o
+-- Right "10.3"
+asText :: Value -> Either String T.Text
+asText (String t) = Right t
+asText (Number n) = Right . T.pack $ show n
+asText o          = Left $ "Expected a string, but received: " <> show o
