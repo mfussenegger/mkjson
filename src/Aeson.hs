@@ -37,21 +37,20 @@ asInt o          = error $ "Expected an integer but received: " <> show o
 -- | Try to extract a Double from Value
 --
 -- >>> asDouble (Number 10.3)
--- 10.3
+-- Right 10.3
 --
 -- >>> asDouble (String "10.5")
--- 10.5
+-- Right 10.5
 --
 -- >>> asDouble (String "foo")
--- *** Exception: Expected a double, but received: foo
--- ...
-asDouble :: Value -> Double
-asDouble (Number n) = S.toRealFloat n
+-- Left "Expected a double, but received: foo"
+asDouble :: Value -> Either String Double
+asDouble (Number n) = Right $ S.toRealFloat n
 asDouble (String s) =
   case T.double s of
-    (Right (n, _)) -> n
-    (Left _)       -> error $ "Expected a double, but received: " <> T.unpack s
-asDouble o          = error $ "Expected a double, but received: " <> show o
+    (Right (n, _)) -> Right n
+    (Left _)       -> Left $ "Expected a double, but received: " <> T.unpack s
+asDouble o          = Left $ "Expected a double, but received: " <> show o
 
 
 asArray :: Value -> V.Vector Value

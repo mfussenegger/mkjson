@@ -11,7 +11,7 @@ module Fake (
 
 import qualified Aeson                      as A
 import           Control.Monad              (forM, replicateM)
-import           Control.Monad.Except       (ExceptT)
+import           Control.Monad.Except       (ExceptT, MonadError)
 import qualified Control.Monad.Except       as Except
 import           Control.Monad.IO.Class     (MonadIO, liftIO)
 import           Control.Monad.State.Class  (MonadState)
@@ -48,6 +48,7 @@ newtype Fake a = Fake { runFake :: ExceptT String (StateT Env IO) a }
   , Monad
   , MonadState Env
   , MonadIO
+  , MonadError String
   )
 
 runFakeT :: Maybe Int -> Fake a -> IO a
@@ -102,8 +103,8 @@ randomInt lower upper = do
 -- Number 1.500000257527587
 randomDouble :: Expr -> Expr -> Fake Value
 randomDouble lower upper = do
-  lower' <- A.asDouble <$> eval lower
-  upper' <- A.asDouble <$> eval upper
+  lower' <- Except.liftEither =<< A.asDouble <$> eval lower
+  upper' <- Except.liftEither =<< A.asDouble <$> eval upper
   Number . S.fromFloatDigits <$> State.state (randomR (lower', upper'))
 
 
