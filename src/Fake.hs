@@ -27,8 +27,9 @@ import qualified Data.UUID.V1                     as UUID1
 import qualified Data.Vector                      as V
 import           Expr                             (Expr (..))
 import           Prelude                          hiding (lines, replicate)
-import           System.Random                    (StdGen, mkStdGen, newStdGen,
-                                                   random, randomR)
+import           System.Random                    (RandomGen (..), StdGen,
+                                                   mkStdGen, newStdGen, random,
+                                                   randomR)
 import qualified Text.Regex.TDFA.Pattern          as R
 import qualified Text.Regex.TDFA.ReadRegex        as R
 
@@ -41,9 +42,19 @@ import qualified Text.Regex.TDFA.ReadRegex        as R
 
 type State a = StateT Env IO a
 
+
 data Env = Env
   { envStdGen :: StdGen
   , envFileCache :: M.HashMap T.Text (V.Vector Value) }
+
+
+instance RandomGen Env where
+  next env = (x, env { envStdGen = g' })
+    where
+      (x, g') = next (envStdGen env)
+  split env = (env { envStdGen = g' }, env { envStdGen = g'' })
+    where
+      (g', g'') = split (envStdGen env)
 
 
 runExpr :: Int -> Expr -> IO Value
@@ -58,15 +69,6 @@ newEnv = do
   pure $ Env stdGen M.empty
 
 
-withStdGen :: Monad m => (StdGen -> (a, StdGen)) -> StateT Env m a
-withStdGen f = do
-  e@Env{..} <- State.get
-  let
-    (x, stdGen) = f envStdGen
-  State.put $ e { envStdGen = stdGen }
-  pure x
-
-
 uuid1 :: IO UUID.UUID
 uuid1 = do
   uuid <- UUID1.nextUUID
@@ -78,31 +80,31 @@ uuid1 = do
 -- | Generate a random int
 --
 -- >>> exec "randomInt(1, 2)"
--- Number 2.0
+-- Number 1.0
 randomInt :: Expr -> Expr -> State Value
 randomInt lower upper = do
   lower' <- A.asInt <$> eval lower
   upper' <- A.asInt <$> eval upper
-  Number . fromIntegral <$> withStdGen (randomR (lower', upper'))
+  Number . fromIntegral <$> State.state (randomR (lower', upper'))
 
 
 -- | Generate a random double
 --
 -- >>> exec "randomDouble(1.5, 3)"
--- Number 1.6166855626250152
+-- Number 1.500000257527587
 randomDouble :: Expr -> Expr -> State Value
 randomDouble lower upper = do
   lower' <- A.asDouble <$> eval lower
   upper' <- A.asDouble <$> eval upper
-  Number . S.fromFloatDigits <$> withStdGen (randomR (lower', upper'))
+  Number . S.fromFloatDigits <$> State.state (randomR (lower', upper'))
 
 
 -- | Generate a random boolean
 --
 -- >>> exec "randomBool"
--- Bool True
+-- Bool False
 randomBool :: Monad m => StateT Env m Value
-randomBool = Bool <$> withStdGen random
+randomBool = Bool <$> State.state random
 
 
 -- | Select one random item of an array
@@ -112,7 +114,7 @@ randomBool = Bool <$> withStdGen random
 oneOfArray :: Expr -> State Value
 oneOfArray arr = do
   arr' <- A.asArray <$> eval arr
-  idx <- withStdGen $ randomR (0, length arr' - 1)
+  idx <- State.state $ randomR (0, length arr' - 1)
   pure $ arr' V.! idx
 
 
@@ -138,7 +140,7 @@ replicate num expr = do
 -- | Create an object from a list in the  [key, value [, ...]] form
 --
 -- >>> exec "object('x', randomInt(2, 4), oneOf('y', 'z'), 3)"
--- Object (fromList [("x",Number 4.0),("y",Number 3.0)])
+-- Object (fromList [("z",Number 3.0),("x",Number 4.0)])
 -- 
 objectFromArgs :: [Expr] -> State Value
 objectFromArgs args = do
@@ -156,13 +158,13 @@ objectFromArgs args = do
 
 rndListItem :: Monad m => [a] -> StateT Env m a
 rndListItem xs = do
-  idx <- withStdGen $ randomR (0, length xs - 1)
+  idx <- State.state $ randomR (0, length xs - 1)
   pure $ xs !! idx
 
 
 rndSetItem :: Monad m => Set.Set a -> StateT Env m a
 rndSetItem xs = do
-  idx <- withStdGen $ randomR (0, Set.size xs - 1)
+  idx <- State.state $ randomR (0, Set.size xs - 1)
   pure $ Set.elemAt idx xs
 
 
@@ -173,13 +175,13 @@ allPossibleChars = Set.fromList [minBound..maxBound]
 -- | Create random data that would be matched by the given regex
 --
 -- >>> exec "fromRegex('\\d-\\d{1,3}-FOO')"
--- String "6-78-FOO"
+-- String "5-67-FOO"
 --
 -- >>> exec "fromRegex('[a-z]{3}')"
--- String "vjy"
+-- String "esh"
 --
 -- >>> exec "fromRegex('[^0-9][0-9]B')"
--- String "\27960\&5B"
+-- String "\211735\&4B"
 fromRegex :: Monad m => T.Text -> StateT Env m Value
 fromRegex input =
   case R.parseRegex input' of
@@ -189,7 +191,7 @@ fromRegex input =
     input' = T.unpack input
     defaultUpper = 10
     replicatePattern lower upper pattern = do
-      numChars <- withStdGen $ randomR (lower, upper)
+      numChars <- State.state $ randomR (lower, upper)
       T.concat <$> replicateM numChars (generateText pattern)
     generateText p = case p of
       (R.POr patterns) -> rndListItem patterns >>= generateText
@@ -204,7 +206,7 @@ fromRegex input =
           charToText <$> rndSetItem (Set.difference allPossibleChars notAllowedChars)
         Nothing -> error $ "Can't generate data from regex pattern" <> show ps
       (R.PEscape _ 'd') -> do
-        T.pack . show <$> (withStdGen $ randomR (0, 9 :: Int))
+        T.pack . show <$> (State.state $ randomR (0, 9 :: Int))
       (R.PChar _ char) -> pure $ charToText char
       _ -> error $ "Can't generate data from regex pattern" <> show p
     fromPatternSet ps@(R.PatternSet mCharSet _ _ _) =
@@ -231,10 +233,11 @@ fromFile fileName = do
 -- | Generate a random character
 --
 -- >>> exec "randomChar()"
--- String "\39335"
+-- String "\629160"
 randomChar :: Monad m => StateT Env m Value
-randomChar = charToString <$> rndSetItem allPossibleChars 
+randomChar = charToString <$> State.state random
   where
+    charToString :: Char -> Value
     charToString = String . T.pack . (: [])
 
 -- | Create a value getter for an expression
@@ -243,13 +246,13 @@ randomChar = charToString <$> rndSetItem allPossibleChars
 -- String "0099a82c-36f7-4321-8012-daa4305fd84b"
 --
 -- >>> exec "array(randomInt(1, 10), randomDouble(1, 20))"
--- Array [Number 6.0,Number 14.108305934824038]
+-- Array [Number 5.0,Number 1.0000012432210876]
 --
 eval :: Expr -> State Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
 eval (DoubleLiteral x) = pure $ Number x
-eval (FunctionCall "uuid4" []) = String . UUID.toText <$> withStdGen random
+eval (FunctionCall "uuid4" []) = String . UUID.toText <$> State.state random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> liftIO uuid1
 eval (FunctionCall "null" []) = pure Null
 eval (FunctionCall "randomBool" []) = randomBool
