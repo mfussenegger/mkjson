@@ -7,8 +7,16 @@ jobs:
       - script: curl -sSL https://get.haskellstack.org/ | sh
         displayName: Install stack
 
+      - script: stack build --flag fake-json:-static
+        displayName: Build
+
       - script: stack test
         displayName: Run tests
+
+      - task: PublishPipelineArtifact@0
+        inputs:
+          artifactName: 'fake-json-linux-x86_64'
+          targetPath: '.stack-work/install/x86_64-linux/lts-12.20/8.4.4/bin/'
 
   - job: MacOSTest
     pool:
@@ -17,8 +25,16 @@ jobs:
       - script: curl -sSL https://get.haskellstack.org/ | sh
         displayName: Install stack
 
+      - script: stack build --flag fake-json:-static
+        displayName: Build
+
       - script: stack test
         displayName: Run tests
+
+      - task: PublishPipelineArtifact@0
+        inputs:
+          artifactName: 'fake-json-osx-x86_64'
+          targetPath: '.stack-work/install/x86_64-osx/lts-12.20/8.4.4/bin/'
 
   - job: WindowsTest
     pool:
@@ -27,5 +43,47 @@ jobs:
       - script: choco install haskell-stack
         displayName: Install stack
 
+      - script: stack build --flag fake-json:-static
+        displayName: Build
+
       - script: stack test
         displayName: Run tests
+
+      - task: PublishPipelineArtifact@0
+        inputs:
+          artifactName: 'fake-json-windows-x86_64'
+          targetPath: '.stack-work\install\ad603a72\bin'
+
+  - job: Release
+    dependsOn:
+      - LinuxTest
+      - MacOSTest
+      - WindowsTest
+
+    steps:
+      - script: mkdir -p $(System.DefaultWorkingDirectory)/artifacts/
+      - task: DownloadPipelineArtifact@0
+        inputs:
+          artifactName: 'fake-json-windows-x86_64'
+          targetPath: $(System.DefaultWorkingDirectory)/artifacts/
+
+      - task: DownloadPipelineArtifact@0
+        inputs:
+          artifactName: 'fake-json-osx-x86_64'
+          targetPath: $(System.DefaultWorkingDirectory)/artifacts/
+      - script: mv $(System.DefaultWorkingDirectory)/artifacts/fake-json{,-osx-x86_64}
+
+      - task: DownloadPipelineArtifact@0
+        inputs:
+          artifactName: 'fake-json-linux-x86_64'
+          targetPath: $(System.DefaultWorkingDirectory)/artifacts/
+      - script: mv $(System.DefaultWorkingDirectory)/artifacts/fake-json{,-linux-x86_64}
+
+      - task: GithubRelease@0
+        inputs:
+          gitHubConnection: 'GitHub connection'
+          repositoryName: mfussenegger/fake-json
+          target: '$(build.sourceVersion)'
+          assets: $(System.DefaultWorkingDirectory)/artifacts/*
+          tagSource: 'auto'
+          isDraft: true
