@@ -1,17 +1,17 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Fake (
   State,
   Env(..),
-  newEnv,
   eval,
-  runExpr
+  runFakeT
 ) where
 
 import qualified Aeson                      as A
 import           Control.Monad              (forM, replicateM)
-import           Control.Monad.IO.Class     (liftIO)
+import           Control.Monad.IO.Class     (liftIO, MonadIO)
 import           Control.Monad.State.Class  (MonadState)
 import           Control.Monad.State.Strict (StateT)
 import qualified Control.Monad.State.Strict as State
@@ -36,16 +36,28 @@ import qualified Text.Regex.TDFA.ReadRegex  as R
 
 -- $setup
 -- >>> :set -XOverloadedStrings
--- >>> let exec expr = runExpr (Just 1) (expr)
+-- >>> let exec expr = runFakeT (Just 1) (eval expr)
 
+
+newtype Fake a = Fake { runFake :: StateT Env IO a }
+  deriving
+  ( Functor
+  , Applicative
+  , Monad
+  , MonadState Env
+  , MonadIO
+  )
+
+runFakeT :: Maybe Int -> Fake a -> IO a
+runFakeT seed fake = do
+  env <- newEnv seed
+  State.evalStateT (runFake fake) env
 
 type State a = StateT Env IO a
-
 
 data Env = Env
   { envStdGen :: StdGen
   , envFileCache :: M.HashMap T.Text (V.Vector Value) }
-
 
 instance RandomGen Env where
   next env = (x, env { envStdGen = g' })
@@ -54,11 +66,6 @@ instance RandomGen Env where
   split env = (env { envStdGen = g' }, env { envStdGen = g'' })
     where
       (g', g'') = split (envStdGen env)
-
-
-runExpr :: Maybe Int -> Expr -> IO Value
-runExpr seed expr = newEnv seed >>= State.evalStateT (eval expr)
-
 
 newEnv :: Maybe Int -> IO Env
 newEnv (Just seed) = pure $ Env (mkStdGen seed) M.empty
@@ -77,7 +84,7 @@ uuid1 = do
 --
 -- >>> exec "randomInt(1, 2)"
 -- Number 1.0
-randomInt :: Expr -> Expr -> State Value
+randomInt :: Expr -> Expr -> Fake Value
 randomInt lower upper = do
   lower' <- A.asInt <$> eval lower
   upper' <- A.asInt <$> eval upper
@@ -88,7 +95,7 @@ randomInt lower upper = do
 --
 -- >>> exec "randomDouble(1.5, 3)"
 -- Number 1.500000257527587
-randomDouble :: Expr -> Expr -> State Value
+randomDouble :: Expr -> Expr -> Fake Value
 randomDouble lower upper = do
   lower' <- A.asDouble <$> eval lower
   upper' <- A.asDouble <$> eval upper
@@ -107,7 +114,7 @@ randomBool = Bool <$> State.state random
 --
 -- >>> exec "oneOf(array(37, 42, 21))"
 -- Number 21.0
-oneOfArray :: Expr -> State Value
+oneOfArray :: Expr -> Fake Value
 oneOfArray arr = do
   arr' <- A.asArray <$> eval arr
   idx <- State.state $ randomR (0, length arr' - 1)
@@ -119,10 +126,9 @@ oneOfArray arr = do
 -- >>> exec "oneOf(37, 42, 21)"
 -- Number 21.0
 --
--- >>> env <- newEnv (Just 1)
--- >>> State.evalStateT (oneOfArgs []) env
+-- >>> runFakeT Nothing (oneOfArgs [])
 -- Nothing
-oneOfArgs :: [Expr] -> State (Maybe Value)
+oneOfArgs :: [Expr] -> Fake (Maybe Value)
 oneOfArgs args = do
   rndArg <- rndListItem args
   case rndArg of
@@ -135,7 +141,7 @@ oneOfArgs args = do
 -- >>> exec "replicate(randomInt(2, 4), oneOf(37, 42, 21))"
 -- Array [Number 42.0,Number 42.0,Number 21.0,Number 42.0]
 --
-replicate :: Expr -> Expr -> State Value
+replicate :: Expr -> Expr -> Fake Value
 replicate num expr = do
   num' <- A.asInt <$> eval num
   Array <$> V.replicateM num' (eval expr)
@@ -146,7 +152,7 @@ replicate num expr = do
 -- >>> exec "object('x', randomInt(2, 4), oneOf('y', 'z'), 3)"
 -- Object (fromList [("z",Number 3.0),("x",Number 4.0)])
 -- 
-objectFromArgs :: [Expr] -> State Value
+objectFromArgs :: [Expr] -> Fake Value
 objectFromArgs args = do
   let
     keyValuePairs = mkPairs (fmap eval args)
@@ -225,7 +231,7 @@ fromRegex input =
     charToText c = T.pack [c]
 
 
-fromFile :: Expr -> State Value
+fromFile :: Expr -> Fake Value
 fromFile fileName = do
   fileName' <- A.asText <$> eval fileName
   e@Env{..} <- State.get
@@ -264,15 +270,15 @@ maybeFail err x  = do
 -- >>> exec "array(randomInt(1, 10), randomDouble(1, 20))"
 -- Array [Number 5.0,Number 1.0000012432210876]
 --
-eval :: Expr -> State Value
+eval :: Expr -> Fake Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
 eval (DoubleLiteral x) = pure $ Number x
 eval (FunctionCall "uuid4" []) = String . UUID.toText <$> State.state random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> liftIO uuid1
 eval (FunctionCall "null" []) = pure Null
-eval (FunctionCall "randomBool" []) = randomBool
-eval (FunctionCall "randomChar" []) = randomChar
+eval (FunctionCall "randomBool" []) = Fake randomBool
+eval (FunctionCall "randomChar" []) = Fake randomChar
 eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
 eval (FunctionCall "randomDouble" [lower, upper]) = randomDouble lower upper
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args

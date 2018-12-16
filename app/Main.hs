@@ -5,7 +5,6 @@ module Main where
 
 import           Control.Monad              (forever)
 import           Control.Monad.IO.Class     (liftIO)
-import qualified Control.Monad.State.Strict as State
 import           Data.Aeson                 (encode, object)
 import qualified Data.ByteString.Lazy.Char8 as BL
 import           Data.Either                (isRight, lefts)
@@ -13,7 +12,7 @@ import           Data.Maybe                 (mapMaybe)
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import           Expr                       (parseExpr)
-import           Fake                       (eval, newEnv)
+import           Fake                       (eval, runFakeT)
 import           System.Environment         (getArgs)
 
 parseColumnDefinition :: String -> Maybe (Text, Text)
@@ -29,7 +28,6 @@ parseColumnDefinition x =
 main :: IO ()
 main = do
   args <- getArgs
-  env <- newEnv Nothing
   let
     columns = mapMaybe parseColumnDefinition args
     allExpressions = fmap (\(x, y) -> (x, parseExpr y)) columns
@@ -42,7 +40,7 @@ main = do
         printRecords = forever $
           mapM runProvider providers >>= liftIO . BL.putStrLn . encode . object
       in
-        State.runStateT printRecords env >> pure ()
+        runFakeT Nothing printRecords >> pure ()
     else
       mapM_ print errored
   where
