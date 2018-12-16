@@ -11,7 +11,9 @@ module Fake (
 
 import qualified Aeson                      as A
 import           Control.Monad              (forM, replicateM)
-import           Control.Monad.IO.Class     (liftIO, MonadIO)
+import           Control.Monad.Except       (ExceptT)
+import qualified Control.Monad.Except       as Except
+import           Control.Monad.IO.Class     (MonadIO, liftIO)
 import           Control.Monad.State.Class  (MonadState)
 import           Control.Monad.State.Strict (StateT)
 import qualified Control.Monad.State.Strict as State
@@ -39,7 +41,7 @@ import qualified Text.Regex.TDFA.ReadRegex  as R
 -- >>> let exec expr = runFakeT (Just 1) (eval expr)
 
 
-newtype Fake a = Fake { runFake :: StateT Env IO a }
+newtype Fake a = Fake { runFake :: ExceptT String (StateT Env IO) a }
   deriving
   ( Functor
   , Applicative
@@ -51,7 +53,10 @@ newtype Fake a = Fake { runFake :: StateT Env IO a }
 runFakeT :: Maybe Int -> Fake a -> IO a
 runFakeT seed fake = do
   env <- newEnv seed
-  State.evalStateT (runFake fake) env
+  result <- State.evalStateT (Except.runExceptT (runFake fake)) env
+  case result of
+    Left errorMsg -> error errorMsg
+    Right result' -> pure result'
 
 type State a = StateT Env IO a
 
@@ -106,7 +111,7 @@ randomDouble lower upper = do
 --
 -- >>> exec "randomBool"
 -- Bool False
-randomBool :: Monad m => StateT Env m Value
+randomBool :: (RandomGen g, MonadState g m) => m Value
 randomBool = Bool <$> State.state random
 
 
@@ -249,7 +254,7 @@ fromFile fileName = do
 --
 -- >>> exec "randomChar()"
 -- String "\629160"
-randomChar :: Monad m => StateT Env m Value
+randomChar :: (RandomGen g, MonadState g m) => m Value
 randomChar = charToString <$> State.state random
   where
     charToString :: Char -> Value
@@ -277,8 +282,8 @@ eval (DoubleLiteral x) = pure $ Number x
 eval (FunctionCall "uuid4" []) = String . UUID.toText <$> State.state random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> liftIO uuid1
 eval (FunctionCall "null" []) = pure Null
-eval (FunctionCall "randomBool" []) = Fake randomBool
-eval (FunctionCall "randomChar" []) = Fake randomChar
+eval (FunctionCall "randomBool" []) = randomBool
+eval (FunctionCall "randomChar" []) = randomChar
 eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
 eval (FunctionCall "randomDouble" [lower, upper]) = randomDouble lower upper
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
