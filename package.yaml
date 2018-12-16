@@ -17,6 +17,9 @@ description: |
 ghc-options:
   - -Wall
   - -fno-warn-unused-do-bind
+  - -fwarn-tabs
+  - -fwarn-incomplete-uni-patterns
+  - -fwarn-incomplete-record-updates
 
 dependencies:
   - base >= 4.7 && < 5
