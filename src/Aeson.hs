@@ -8,7 +8,6 @@ module Aeson (
 
 
 import           Data.Aeson      (Value (..))
-import           Data.Maybe      (fromJust)
 import qualified Data.Scientific as S
 import qualified Data.Text       as T
 import qualified Data.Text.Read  as T
@@ -17,21 +16,22 @@ import qualified Data.Vector     as V
 -- | Try to extract an Int from Value
 --
 -- >>> asInt (Number 10)
--- 10
+-- Right 10
 --
 -- >>> asInt (String "10")
--- 10
+-- Right 10
+--
+-- >>> asInt (Number 10.38)
+-- Left "Could not convert 10.38 to an Int"
 --
 -- >>> asInt (String "foo")
--- *** Exception: Expected an integer, but received: foo
--- ...
-asInt :: Value -> Int
-asInt (Number n) = fromJust $ S.toBoundedInteger n
-asInt (String s) =
-  case T.decimal s of
-    (Right (n, _)) -> n
-    (Left _)       -> error $ "Expected an integer, but received: " <> T.unpack s
-asInt o          = error $ "Expected an integer but received: " <> show o
+-- Left "input does not start with a digit"
+asInt :: Value -> Either String Int
+asInt (Number n) = case S.toBoundedInteger n of
+  Nothing -> Left $ "Could not convert " <> show n <> " to an Int"
+  Just n' -> Right n'
+asInt (String s) = fmap fst (T.decimal s)
+asInt o          = Left $ "Expected an integer but received: " <> show o
 
 
 -- | Try to extract a Double from Value

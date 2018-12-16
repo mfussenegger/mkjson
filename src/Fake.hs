@@ -93,8 +93,8 @@ uuid1 = do
 -- Number 1.0
 randomInt :: Expr -> Expr -> Fake Value
 randomInt lower upper = do
-  lower' <- A.asInt <$> eval lower
-  upper' <- A.asInt <$> eval upper
+  lower' <- Except.liftEither =<< A.asInt <$> eval lower
+  upper' <- Except.liftEither =<< A.asInt <$> eval upper
   Number . fromIntegral <$> State.state (randomR (lower', upper'))
 
 
@@ -151,7 +151,7 @@ oneOfArgs args = do
 --
 replicate :: Expr -> Expr -> Fake Value
 replicate num expr = do
-  num' <- A.asInt <$> eval num
+  num' <- Except.liftEither =<< A.asInt <$> eval num
   Array <$> V.replicateM num' (eval expr)
 
 
