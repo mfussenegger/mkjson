@@ -29,7 +29,7 @@ parseColumnDefinition x =
 main :: IO ()
 main = do
   args <- getArgs
-  env <- newEnv
+  env <- newEnv Nothing
   let
     columns = mapMaybe parseColumnDefinition args
     allExpressions = fmap (\(x, y) -> (x, parseExpr y)) columns

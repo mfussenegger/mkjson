@@ -36,8 +36,7 @@ import qualified Text.Regex.TDFA.ReadRegex  as R
 
 -- $setup
 -- >>> :set -XOverloadedStrings
--- >>> let g = Env (mkStdGen 1) M.empty
--- >>> let exec expr = State.evalStateT (eval expr) g
+-- >>> let exec expr = runExpr (Just 1) (expr)
 
 
 type State a = StateT Env IO a
@@ -57,16 +56,13 @@ instance RandomGen Env where
       (g', g'') = split (envStdGen env)
 
 
-runExpr :: Int -> Expr -> IO Value
-runExpr seed expr = State.evalStateT (eval expr) env
-  where
-    env = Env (mkStdGen seed) M.empty
+runExpr :: Maybe Int -> Expr -> IO Value
+runExpr seed expr = newEnv seed >>= State.evalStateT (eval expr)
 
 
-newEnv :: IO Env
-newEnv = do
-  stdGen <- newStdGen
-  pure $ Env stdGen M.empty
+newEnv :: Maybe Int -> IO Env
+newEnv (Just seed) = pure $ Env (mkStdGen seed) M.empty
+newEnv Nothing     = (flip Env) M.empty <$> newStdGen
 
 
 uuid1 :: IO UUID.UUID
@@ -123,7 +119,7 @@ oneOfArray arr = do
 -- >>> exec "oneOf(37, 42, 21)"
 -- Number 21.0
 --
--- >>> env <- newEnv
+-- >>> env <- newEnv (Just 1)
 -- >>> State.evalStateT (oneOfArgs []) env
 -- Nothing
 oneOfArgs :: [Expr] -> State (Maybe Value)
