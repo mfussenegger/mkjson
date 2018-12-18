@@ -33,6 +33,7 @@ dependencies:
   - unordered-containers
   - containers
   - regex-tdfa
+  - optparse-applicative
 
 library:
   source-dirs: src

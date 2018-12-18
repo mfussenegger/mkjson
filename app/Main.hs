@@ -2,18 +2,20 @@
 
 module Main where
 
-
+import qualified Cli
 import           Control.Monad              (forever)
 import           Control.Monad.IO.Class     (liftIO)
 import           Data.Aeson                 (encode, object)
 import qualified Data.ByteString.Lazy.Char8 as BL
 import           Data.Either                (isRight, lefts)
+import           Data.List                  (partition)
 import           Data.Maybe                 (mapMaybe)
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import           Expr                       (parseExpr)
 import           Fake                       (eval, runFakeT)
 import           System.Environment         (getArgs)
+
 
 parseColumnDefinition :: String -> Maybe (Text, Text)
 parseColumnDefinition x =
@@ -29,18 +31,20 @@ main :: IO ()
 main = do
   args <- getArgs
   let
-    columns = mapMaybe parseColumnDefinition args
+    (cliArgs, fields) = partition (notElem '=') args
+    columns = mapMaybe parseColumnDefinition fields
     allExpressions = fmap (\(x, y) -> (x, parseExpr y)) columns
     expressions = fmap unpackRight (filter (isRight . snd) allExpressions)
     errored = lefts $ fmap snd allExpressions
     providers = fmap (\(x, y) -> (x, eval y)) expressions
+  parsedArgs <- Cli.parseArgs cliArgs
   if null errored
     then
       let
         printRecords = forever $
           mapM runProvider providers >>= liftIO . BL.putStrLn . encode . object
       in
-        runFakeT Nothing printRecords >> pure ()
+        runFakeT (Cli.seed parsedArgs) printRecords >> pure ()
     else
       mapM_ print errored
   where
