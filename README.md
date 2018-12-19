@@ -35,7 +35,9 @@ a field within the JSON object.
 
 ## Installation
 
-There might be pre-build binaries available at some point, until then:
+Get a pre-build binary from the
+[releases](https://github.com/mfussenegger/fake-json/releases) page or build it
+yourself:
 
 Install stack:
 
