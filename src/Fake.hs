@@ -28,6 +28,8 @@ import qualified Data.Set                   as Set
 import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as T
 import           Data.Time.Calendar         (Day (..), showGregorian)
+import           Data.Time.Format           (parseTimeM)
+import           Data.Time.Format
 import qualified Data.UUID                  as UUID
 import qualified Data.UUID.V1               as UUID1
 import qualified Data.Vector                as V
@@ -277,14 +279,39 @@ randomChar = charToString <$> State.state random
     charToString = String . T.pack . (: [])
 
 
--- | Generate a random date between (inclusive) 1858-11-17 and 2132-09-01
+-- | Generate a random date between (inclusive) lo and hi
+--
+-- lo and hi default to 1858-11-17 and 2132-09-01
 --
 -- >>> exec "randomDate()"
 -- String "2063-01-23"
-randomDate :: (RandomGen g, MonadState g m) => m Value
-randomDate = dayAsValue . ModifiedJulianDay <$> State.state (randomR (0, 100000))
+--
+-- >>> exec "randomDate('2001-01-01', '2018-12-31')"
+-- String "2015-03-21"
+--
+-- >>> exec "randomDate('2002', '2018-12-31')"
+-- *** Exception: user error (parseTimeM: no parse of "2002")
+-- ...
+randomDate :: (MonadError String m, RandomGen g, MonadState g m)
+           => Maybe T.Text
+           -> Maybe T.Text
+           -> m Value
+randomDate lo hi = do
+  l <- lo'
+  h <- hi'
+  dayAsValue . ModifiedJulianDay <$> State.state (randomR (l, h))
   where
+    defaultLo = pure $ ModifiedJulianDay 0
+    defaultHi = pure $ ModifiedJulianDay 100000
+    lo' = toModifiedJulianDay <$> maybe defaultLo parseDay lo
+    hi' = toModifiedJulianDay <$> maybe defaultHi parseDay hi
     dayAsValue = String . T.pack . showGregorian
+    parseDay = parseTimeM False defaultTimeLocale "%F" . T.unpack
+
+
+rightToMaybe :: Either a b -> Maybe b
+rightToMaybe (Left _)  = Nothing
+rightToMaybe (Right b) = Just b
 
 
 -- | Create a value getter for an expression
@@ -306,7 +333,11 @@ eval (FunctionCall "randomBool" []) = randomBool
 eval (FunctionCall "randomChar" []) = randomChar
 eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
 eval (FunctionCall "randomDouble" [lower, upper]) = randomDouble lower upper
-eval (FunctionCall "randomDate" []) = randomDate
+eval (FunctionCall "randomDate" []) = randomDate Nothing Nothing
+eval (FunctionCall "randomDate" [lower, upper]) = do
+  lo <- A.asText <$> eval lower
+  hi <- A.asText <$> eval upper
+  randomDate (rightToMaybe lo) (rightToMaybe hi)
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
 eval (FunctionCall "oneOf" [arg]) = oneOfArray arg
 eval (FunctionCall "oneOf" args) = oneOfArgs args
@@ -317,6 +348,6 @@ eval (FunctionCall "fromRegex" [pattern]) =
   eval pattern
   <&> A.asText
   >>= Except.liftEither
-  >>= (Fake . fromRegex)
+  >>= Fake . fromRegex
   <&> String
 eval (FunctionCall name _) = Except.throwError $ "No random generator for " <> T.unpack name
