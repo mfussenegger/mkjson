@@ -27,6 +27,7 @@ import qualified Data.Scientific            as S
 import qualified Data.Set                   as Set
 import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as T
+import           Data.Time.Calendar         (Day (..), showGregorian)
 import qualified Data.UUID                  as UUID
 import qualified Data.UUID.V1               as UUID1
 import qualified Data.Vector                as V
@@ -276,6 +277,16 @@ randomChar = charToString <$> State.state random
     charToString = String . T.pack . (: [])
 
 
+-- | Generate a random date between (inclusive) 1858-11-17 and 2132-09-01
+--
+-- >>> exec "randomDate()"
+-- String "2063-01-23"
+randomDate :: (RandomGen g, MonadState g m) => m Value
+randomDate = dayAsValue . ModifiedJulianDay <$> State.state (randomR (0, 100000))
+  where
+    dayAsValue = String . T.pack . showGregorian
+
+
 -- | Create a value getter for an expression
 --
 -- >>> exec "uuid4"
@@ -295,6 +306,7 @@ eval (FunctionCall "randomBool" []) = randomBool
 eval (FunctionCall "randomChar" []) = randomChar
 eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
 eval (FunctionCall "randomDouble" [lower, upper]) = randomDouble lower upper
+eval (FunctionCall "randomDate" []) = randomDate
 eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
 eval (FunctionCall "oneOf" [arg]) = oneOfArray arg
 eval (FunctionCall "oneOf" args) = oneOfArgs args

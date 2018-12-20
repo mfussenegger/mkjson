@@ -24,6 +24,7 @@ a field within the JSON object.
  - randomChar
  - randomInt(lower, upper)
  - randomDouble(lower, upper)
+ - randomDate
  - array(expr [, ...])
  - oneOf(arrayExpr)
  - oneOf(expr, expr [, ...])

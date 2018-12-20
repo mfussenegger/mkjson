@@ -37,6 +37,7 @@ dependencies:
   - containers
   - regex-tdfa
   - optparse-applicative
+  - time
 
 library:
   source-dirs: src
