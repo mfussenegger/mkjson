@@ -312,7 +312,7 @@ randomDate lo hi = do
 -- | Generate a random dateTime
 --
 -- >>> exec "randomDateTime"
--- String "2063-01-23T12:34:50"
+-- String "2063-01-23T12:34:50Z"
 randomDateTime :: (MonadError String m, RandomGen g, MonadState g m)
                => m Value
 randomDateTime = do
@@ -321,7 +321,7 @@ randomDateTime = do
   pure . String . T.pack . formatDateTime $ UTCTime day (secondsToDiffTime seconds)
   where
     formatDateTime = formatTime defaultTimeLocale isoFormat
-    isoFormat = iso8601DateFormat (Just "%H:%M:%S")
+    isoFormat = iso8601DateFormat (Just "%H:%M:%SZ")
 
 
 rightToMaybe :: Either a b -> Maybe b
