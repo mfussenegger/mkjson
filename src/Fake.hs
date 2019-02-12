@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -258,7 +258,7 @@ fromRegex input =
 fromFile :: Expr -> Fake Value
 fromFile fileName = do
   fileName' <- Except.liftEither =<< A.asText <$> eval fileName
-  e@Env{..} <- State.get
+  e@Env{envFileCache} <- State.get
   case M.lookup fileName' envFileCache of
     (Just lines) -> pure $ Array lines
     Nothing      -> do
