@@ -38,6 +38,7 @@ dependencies:
   - regex-tdfa
   - optparse-applicative
   - time
+  - ulid
 
 library:
   source-dirs: src

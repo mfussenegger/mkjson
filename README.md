@@ -19,6 +19,7 @@ a field within the JSON object.
 
  - uuid1
  - uuid4
+ - ulid
  - null
  - randomBool
  - randomChar

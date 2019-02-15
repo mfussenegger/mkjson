@@ -31,6 +31,9 @@ import           Data.Time.Calendar         (Day (..), showGregorian)
 import           Data.Time.Clock            (UTCTime (..), secondsToDiffTime)
 import           Data.Time.Format           (defaultTimeLocale, formatTime,
                                              iso8601DateFormat, parseTimeM)
+import qualified Data.ULID                  as ULID
+import           Data.ULID.Random           (mkULIDRandom)
+import           Data.ULID.TimeStamp        (getULIDTimeStamp)
 import qualified Data.UUID                  as UUID
 import qualified Data.UUID.V1               as UUID1
 import qualified Data.Vector                as V
@@ -333,6 +336,12 @@ dayAsValue :: Day -> Value
 dayAsValue = String . T.pack . showGregorian
 
 
+getUlid :: Fake Value
+getUlid = ULID.ULID
+  <$> liftIO getULIDTimeStamp <*> State.state mkULIDRandom
+  <&> String . T.pack . show
+
+
 -- | Create a value getter for an expression
 --
 -- >>> exec "uuid4"
@@ -347,6 +356,7 @@ eval (StringLiteral x) = pure $ String x
 eval (DoubleLiteral x) = pure $ Number x
 eval (FunctionCall "uuid4" []) = String . UUID.toText <$> State.state random
 eval (FunctionCall "uuid1" []) = String . UUID.toText <$> liftIO uuid1
+eval (FunctionCall "ulid" []) = getUlid
 eval (FunctionCall "null" []) = pure Null
 eval (FunctionCall "randomBool" []) = randomBool
 eval (FunctionCall "randomChar" []) = randomChar
