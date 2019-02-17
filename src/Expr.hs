@@ -19,8 +19,14 @@ import           Text.Parsec.Text  (Parser)
 data Expr = IntLiteral !Integer
           | DoubleLiteral !Scientific
           | StringLiteral !Text
-          | FunctionCall { fcName :: !Text, fcArgs :: ![Expr] }
+          | FunctionCall !Function
           deriving (Show, Eq)
+
+
+data Function = Function
+  { fcName :: !Text
+  , fcArgs :: ![Expr] }
+  deriving (Show, Eq)
 
 
 instance IsString Expr where
@@ -63,7 +69,7 @@ functionCall :: Parser Expr
 functionCall = do
   name <- ident
   args <- fromMaybe [] <$> optionMaybe functionArgs
-  pure $ FunctionCall name args
+  pure $ FunctionCall (Function name args)
   where
     functionArgs = do
       _ <- char '('
@@ -88,10 +94,10 @@ ident = do
 -- Right (DoubleLiteral 20.3)
 --
 -- >>> parseExpr "uuid4"
--- Right (FunctionCall {fcName = "uuid4", fcArgs = []})
+-- Right (FunctionCall (Function {fcName = "uuid4", fcArgs = []}))
 --
 -- >>> parseExpr "randomInt(0, 10)"
--- Right (FunctionCall {fcName = "randomInt", fcArgs = [IntLiteral 0,IntLiteral 10]})
+-- Right (FunctionCall (Function {fcName = "randomInt", fcArgs = [IntLiteral 0,IntLiteral 10]}))
 --
 -- >>> parseExpr "'fileName-200.txt'"
 -- Right (StringLiteral "fileName-200.txt")

@@ -37,7 +37,7 @@ import           Data.ULID.TimeStamp        (getULIDTimeStamp)
 import qualified Data.UUID                  as UUID
 import qualified Data.UUID.V1               as UUID1
 import qualified Data.Vector                as V
-import           Expr                       (Expr (..))
+import           Expr                       (Expr (..), Function (..))
 import           Prelude                    hiding (lines, replicate)
 import           System.Random              (Random (..), RandomGen (..),
                                              StdGen, mkStdGen, newStdGen)
@@ -354,30 +354,30 @@ eval :: Expr -> Fake Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
 eval (DoubleLiteral x) = pure $ Number x
-eval (FunctionCall "uuid4" []) = String . UUID.toText <$> State.state random
-eval (FunctionCall "uuid1" []) = String . UUID.toText <$> liftIO uuid1
-eval (FunctionCall "ulid" []) = getUlid
-eval (FunctionCall "null" []) = pure Null
-eval (FunctionCall "randomBool" []) = randomBool
-eval (FunctionCall "randomChar" []) = randomChar
-eval (FunctionCall "randomInt" [lower, upper]) = randomInt lower upper
-eval (FunctionCall "randomDouble" [lower, upper]) = randomDouble lower upper
-eval (FunctionCall "randomDate" []) = dayAsValue <$> randomDate Nothing Nothing
-eval (FunctionCall "randomDate" [lower, upper]) = do
+eval (FunctionCall (Function "uuid4" [])) = String . UUID.toText <$> State.state random
+eval (FunctionCall (Function "uuid1" [])) = String . UUID.toText <$> liftIO uuid1
+eval (FunctionCall (Function "ulid" [])) = getUlid
+eval (FunctionCall (Function "null" [])) = pure Null
+eval (FunctionCall (Function "randomBool" [])) = randomBool
+eval (FunctionCall (Function "randomChar" [])) = randomChar
+eval (FunctionCall (Function "randomInt" [lower, upper])) = randomInt lower upper
+eval (FunctionCall (Function "randomDouble" [lower, upper])) = randomDouble lower upper
+eval (FunctionCall (Function "randomDate" [])) = dayAsValue <$> randomDate Nothing Nothing
+eval (FunctionCall (Function "randomDate" [lower, upper])) = do
   lo <- A.asText <$> eval lower
   hi <- A.asText <$> eval upper
   dayAsValue <$> randomDate (rightToMaybe lo) (rightToMaybe hi)
-eval (FunctionCall "randomDateTime" []) = randomDateTime
-eval (FunctionCall "array" args) = Array . V.fromList <$> mapM eval args
-eval (FunctionCall "oneOf" [arg]) = oneOfArray arg
-eval (FunctionCall "oneOf" args) = oneOfArgs args
-eval (FunctionCall "replicate" [num, expr]) = replicate num expr
-eval (FunctionCall "object" args) = objectFromArgs args
-eval (FunctionCall "fromFile" [fileName]) = fromFile fileName
-eval (FunctionCall "fromRegex" [pattern]) =
+eval (FunctionCall (Function "randomDateTime" [])) = randomDateTime
+eval (FunctionCall (Function "array" args)) = Array . V.fromList <$> mapM eval args
+eval (FunctionCall (Function "oneOf" [arg])) = oneOfArray arg
+eval (FunctionCall (Function "oneOf" args)) = oneOfArgs args
+eval (FunctionCall (Function "replicate" [num, expr])) = replicate num expr
+eval (FunctionCall (Function "object" args)) = objectFromArgs args
+eval (FunctionCall (Function "fromFile" [fileName])) = fromFile fileName
+eval (FunctionCall (Function "fromRegex" [pattern])) =
   eval pattern
   <&> A.asText
   >>= Except.liftEither
   >>= Fake . fromRegex
   <&> String
-eval (FunctionCall name _) = Except.throwError $ "No random generator for " <> T.unpack name
+eval (FunctionCall (Function name _)) = Except.throwError $ "No random generator for " <> T.unpack name
