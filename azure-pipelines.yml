@@ -16,7 +16,7 @@ jobs:
       - task: PublishPipelineArtifact@0
         inputs:
           artifactName: 'fake-json-linux-x86_64'
-          targetPath: '.stack-work/install/x86_64-linux/lts-13.0/8.6.3/bin/'
+          targetPath: '.stack-work/install/x86_64-linux/lts-13.7/8.6.3/bin/'
 
   - job: MacOSTest
     pool:
@@ -34,7 +34,7 @@ jobs:
       - task: PublishPipelineArtifact@0
         inputs:
           artifactName: 'fake-json-osx-x86_64'
-          targetPath: '.stack-work/install/x86_64-osx/lts-13.0/8.6.3/bin/'
+          targetPath: '.stack-work/install/x86_64-osx/lts-13.7/8.6.3/bin/'
 
   - job: WindowsTest
     pool:
@@ -52,7 +52,7 @@ jobs:
       - task: PublishPipelineArtifact@0
         inputs:
           artifactName: 'fake-json-windows-x86_64'
-          targetPath: '.stack-work\install\1a74cd24\bin'
+          targetPath: '.stack-work\install\05b66a6c\bin'
 
   - job: Release
     dependsOn:
