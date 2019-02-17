@@ -16,10 +16,10 @@ import           Text.Parsec.Text  (Parser)
 -- $setup
 -- >>> :set -XOverloadedStrings
 
-data Expr = IntLiteral Integer
-          | DoubleLiteral Scientific
-          | StringLiteral Text
-          | FunctionCall { fcName :: Text, fcArgs :: [Expr] }
+data Expr = IntLiteral !Integer
+          | DoubleLiteral !Scientific
+          | StringLiteral !Text
+          | FunctionCall { fcName :: !Text, fcArgs :: ![Expr] }
           deriving (Show, Eq)
 
 

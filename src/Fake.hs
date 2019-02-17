@@ -71,8 +71,8 @@ runFakeT seed fake = do
 type State a = StateT Env IO a
 
 data Env = Env
-  { envStdGen :: StdGen
-  , envFileCache :: M.HashMap T.Text (V.Vector Value) }
+  { envStdGen :: !StdGen
+  , envFileCache :: !(M.HashMap T.Text (V.Vector Value)) }
 
 instance RandomGen Env where
   next env = (x, env { envStdGen = g' })
