@@ -74,6 +74,7 @@ tests:
       - -with-rtsopts=-N
     dependencies:
       - fake-json
+
   fake-json-doctest:
     main: doctests.hs
     source-dirs: tests
@@ -81,6 +82,14 @@ tests:
       - fake-json
       - Glob
       - doctest
+
+benchmarks:
+  fake-json-benchmarks:
+    main: bench.hs
+    source-dirs: benchmarks
+    dependencies:
+      - fake-json
+      - criterion
 
 flags:
   static:
