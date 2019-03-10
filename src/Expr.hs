@@ -8,7 +8,7 @@ import           Data.String       (IsString (..))
 import           Data.Text         (Text)
 import qualified Data.Text         as T
 import           Text.Parsec       (many, many1, optionMaybe, parse, sepBy,
-                                    (<|>))
+                                    (<|>), between)
 import           Text.Parsec.Char  (char, digit, letter, noneOf, spaces)
 import           Text.Parsec.Error (ParseError)
 import           Text.Parsec.Text  (Parser)
@@ -58,11 +58,10 @@ number = do
 
 
 stringLiteral :: Parser Expr
-stringLiteral = do
-  _ <- char '\''
-  content <- many (noneOf "\'")
-  _ <- char '\''
-  pure $ StringLiteral $ T.pack content
+stringLiteral = StringLiteral . T.pack <$> string
+  where
+    singleQuote = char '\''
+    string = between singleQuote singleQuote (many (noneOf "\'"))
 
 
 functionCall :: Parser Expr
@@ -71,11 +70,10 @@ functionCall = do
   args <- fromMaybe [] <$> optionMaybe functionArgs
   pure $ FunctionCall (Function name args)
   where
-    functionArgs = do
-      _ <- char '('
-      args <- expr `sepBy` (char ',' >> spaces)
-      _ <- char ')'
-      pure args
+    functionArgs = between open close (expr `sepBy` comma)
+    open = char '('
+    close = char ')'
+    comma = char ',' >> spaces
 
 
 ident :: Parser Text
