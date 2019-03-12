@@ -6,13 +6,13 @@
 generate and print 1 JSON object per line until cancelled:
 
 ```
-↪  fake-json id=uuid4 x="randomInt(0, 10)" | head -n 3
+↪  fake-json id=uuid4() x="randomInt(0, 10)" | head -n 3
 {"id":"2c6ce42f-5f7d-4e65-a1a1-8b39f6cfce19","x":6}
 {"id":"d4c1af69-3cdd-417d-98e0-d3774f5fa1be","x":8}
 {"id":"8fc064c9-57ba-4d78-b205-57899776e757","x":6}
 ```
 
-It takes `fieldName=valueProvider` pairs as argument. Each pair will result in
+It takes `fieldName=valueProvider()` pairs as argument. Each pair will result in
 a field within the JSON object.
 
 ### Available providers

@@ -119,7 +119,7 @@ randomDouble lower upper = do
 
 -- | Generate a random boolean
 --
--- >>> exec "randomBool"
+-- >>> exec "randomBool()"
 -- Bool False
 randomBool :: (RandomGen g, MonadState g m) => m Value
 randomBool = Bool <$> State.state random
@@ -314,7 +314,7 @@ randomDate lo hi = do
 
 -- | Generate a random dateTime
 --
--- >>> exec "randomDateTime"
+-- >>> exec "randomDateTime()"
 -- String "2063-01-23T12:34:50Z"
 randomDateTime :: (MonadError String m, RandomGen g, MonadState g m)
                => m Value
@@ -344,7 +344,7 @@ getUlid = ULID.ULID
 
 -- | Create a value getter for an expression
 --
--- >>> exec "uuid4"
+-- >>> exec "uuid4()"
 -- String "0099a82c-36f7-4321-8012-daa4305fd84b"
 --
 -- >>> exec "array(randomInt(1, 10), randomDouble(1, 20))"

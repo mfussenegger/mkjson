@@ -2,7 +2,6 @@
 
 module Expr where
 
-import           Data.Maybe        (fromMaybe)
 import           Data.Scientific   (Scientific)
 import           Data.String       (IsString (..))
 import           Data.Text         (Text)
@@ -67,8 +66,10 @@ stringLiteral = StringLiteral . T.pack <$> string
 functionCall :: Parser Expr
 functionCall = do
   name <- ident
-  args <- fromMaybe [] <$> optionMaybe functionArgs
-  pure $ FunctionCall (Function name args)
+  args <- optionMaybe functionArgs
+  case args of
+    Nothing    -> pure $ StringLiteral name
+    Just args' -> pure $ FunctionCall (Function name args')
   where
     functionArgs = between open close (expr `sepBy` comma)
     open = char '('
@@ -91,8 +92,11 @@ ident = do
 -- >>> parseExpr "20.3"
 -- Right (DoubleLiteral 20.3)
 --
--- >>> parseExpr "uuid4"
+-- >>> parseExpr "uuid4()"
 -- Right (FunctionCall (Function {fcName = "uuid4", fcArgs = []}))
+--
+-- >>> parseExpr "uuid4"
+-- Right (StringLiteral "uuid4")
 --
 -- >>> parseExpr "randomInt(0, 10)"
 -- Right (FunctionCall (Function {fcName = "randomInt", fcArgs = [IntLiteral 0,IntLiteral 10]}))
