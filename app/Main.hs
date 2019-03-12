@@ -3,7 +3,7 @@
 module Main where
 
 import qualified Cli
-import           Control.Monad              (forever)
+import           Control.Monad              (forever, replicateM)
 import           Control.Monad.IO.Class     (liftIO)
 import           Data.Aeson                 (encode, object)
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -41,13 +41,15 @@ main = do
   if null errored
     then
       let
-        printRecords = forever $
+        printRecords = loop (Cli.num parsedArgs) $
           mapM runProvider providers >>= liftIO . BL.putStrLn . encode . object
       in
         runFakeT (Cli.seed parsedArgs) printRecords >> pure ()
     else
       mapM_ print errored
   where
+    loop Cli.Infinite  = forever
+    loop (Cli.Const n) = replicateM n
     unpackRight (x, Right y) = (x, y)
     unpackRight _            = error "Tuple must only contain Right eithers"
     runProvider (column, provider) = do
