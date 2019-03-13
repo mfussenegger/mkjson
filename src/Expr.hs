@@ -2,15 +2,18 @@
 
 module Expr where
 
-import           Data.Scientific   (Scientific)
-import           Data.String       (IsString (..))
-import           Data.Text         (Text)
-import qualified Data.Text         as T
-import           Text.Parsec       (many, many1, optionMaybe, parse, sepBy,
-                                    (<|>), between)
-import           Text.Parsec.Char  (char, digit, letter, noneOf, spaces)
-import           Text.Parsec.Error (ParseError)
-import           Text.Parsec.Text  (Parser)
+import           Data.Aeson              (Value (..), decode', encode)
+import           Data.Scientific         (Scientific)
+import           Data.String             (IsString (..))
+import           Data.Text               (Text)
+import qualified Data.Text               as T
+import qualified Data.Text.Lazy          as TL
+import qualified Data.Text.Lazy.Encoding as TL
+import           Text.Parsec             (between, many, many1, optionMaybe,
+                                          parse, sepBy, (<|>))
+import           Text.Parsec.Char        (char, digit, letter, noneOf, spaces)
+import           Text.Parsec.Error       (ParseError)
+import           Text.Parsec.Text        (Parser)
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -18,6 +21,7 @@ import           Text.Parsec.Text  (Parser)
 data Expr = IntLiteral !Integer
           | DoubleLiteral !Scientific
           | StringLiteral !Text
+          | JsonLiteral !Value
           | FunctionCall !Function
           deriving (Show, Eq)
 
@@ -40,7 +44,33 @@ expr = literal <|> functionCall
 
 
 literal :: Parser Expr
-literal = number <|> stringLiteral
+literal = number <|> stringLiteral <|> jsonLiteral
+
+
+showExpr :: Expr -> Text
+showExpr (StringLiteral s) = "\"" <> s <> "\""
+showExpr (IntLiteral n)    = T.pack . show $ n
+showExpr (DoubleLiteral n) = T.pack . show $ n
+showExpr (JsonLiteral s)   = TL.toStrict . TL.decodeUtf8 $ encode s
+showExpr (FunctionCall _)  = error "Can only convert literals to text representation"
+
+
+jsonLiteral :: Parser Expr
+jsonLiteral = do
+  assignments <- between (char '{') (char '}') (assignment `sepBy` comma)
+  let
+    objStr = "{" <> T.intercalate ", " assignments <> "}"
+  case decode' (TL.encodeUtf8 . TL.fromStrict $ objStr) of
+    Nothing -> error $ "Invalid JSON string: " <> T.unpack objStr
+    Just v  -> pure $ JsonLiteral v
+  where
+    assignment = do
+      key <- stringLiteral 
+      _ <- colon
+      value <- literal
+      pure $ showExpr key <> ": " <> showExpr value
+    colon = char ':' >> spaces
+    comma = char ',' >> spaces
 
 
 number :: Parser Expr
@@ -59,8 +89,8 @@ number = do
 stringLiteral :: Parser Expr
 stringLiteral = StringLiteral . T.pack <$> string
   where
-    singleQuote = char '\''
-    string = between singleQuote singleQuote (many (noneOf "\'"))
+    quote = char '\'' <|> char '"'
+    string = between quote quote (many (noneOf "\'\""))
 
 
 functionCall :: Parser Expr
@@ -106,5 +136,11 @@ ident = do
 --
 -- >>> parseExpr "''"
 -- Right (StringLiteral "")
+--
+-- >>> parseExpr "{}"
+-- Right (JsonLiteral (Object (fromList [])))
+--
+-- >>> parseExpr "{\"x\": 10, \"y\": {}}"
+-- Right (JsonLiteral (Object (fromList [("x",Number 10.0),("y",Object (fromList []))])))
 parseExpr :: Text -> Either ParseError Expr
 parseExpr = parse expr "(unknown)"
