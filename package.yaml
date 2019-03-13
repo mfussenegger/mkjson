@@ -1,18 +1,18 @@
 ---
-name: fake-json
+name: mkjson
 version: 0.1.0.0
-github: "mfussenegger/fake-json"
+github: "mfussenegger/mkjson"
 license: MIT
 author: "Mathias Fußenegger"
 maintainer: "github@zignar.net"
-copyright: "2018 Mathias Fußenegger"
+copyright: "2019 Mathias Fußenegger"
 
 extra-source-files:
   - README.md
   - ChangeLog.md
 
 description: |
-  Please see the README on GitHub at <https://github.com/mfussenegger/fake-json#readme>
+  Please see the README on GitHub at <https://github.com/mfussenegger/mkjson#readme>
 
 ghc-options:
   - -Wall
@@ -50,13 +50,13 @@ library:
   source-dirs: src
 
 executables:
-  fake-json:
+  mkjson:
     main: Main.hs
     source-dirs: app
     ghc-options:
       - -rtsopts
     dependencies:
-      - fake-json
+      - mkjson
     when:
       - condition: flag(static)
         ld-options:
@@ -65,7 +65,7 @@ executables:
           - fPIC
 
 tests:
-  fake-json-test:
+  mkjson-test:
     main: spec.hs
     source-dirs: tests
     ghc-options:
@@ -73,22 +73,22 @@ tests:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-      - fake-json
+      - mkjson
 
-  fake-json-doctest:
+  mkjson-doctest:
     main: doctests.hs
     source-dirs: tests
     dependencies:
-      - fake-json
+      - mkjson
       - Glob
       - doctest
 
 benchmarks:
-  fake-json-benchmarks:
+  mkjson-benchmarks:
     main: bench.hs
     source-dirs: benchmarks
     dependencies:
-      - fake-json
+      - mkjson
       - criterion
 
 flags:

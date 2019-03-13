@@ -7,7 +7,7 @@ jobs:
       - script: curl -sSL https://get.haskellstack.org/ | sh
         displayName: Install stack
 
-      - script: stack build --pedantic --flag fake-json:-static
+      - script: stack build --pedantic --flag mkjson:-static
         displayName: Build
 
       - script: stack test
@@ -15,7 +15,7 @@ jobs:
 
       - task: PublishPipelineArtifact@0
         inputs:
-          artifactName: 'fake-json-linux-x86_64'
+          artifactName: 'mkjson-linux-x86_64'
           targetPath: '.stack-work/install/x86_64-linux/lts-13.12/8.6.4/bin/'
 
   - job: MacOSTest
@@ -25,7 +25,7 @@ jobs:
       - script: curl -sSL https://get.haskellstack.org/ | sh
         displayName: Install stack
 
-      - script: stack build --pedantic --flag fake-json:-static
+      - script: stack build --pedantic --flag mkjson:-static
         displayName: Build
 
       - script: stack test
@@ -33,7 +33,7 @@ jobs:
 
       - task: PublishPipelineArtifact@0
         inputs:
-          artifactName: 'fake-json-osx-x86_64'
+          artifactName: 'mkjson-osx-x86_64'
           targetPath: '.stack-work/install/x86_64-osx/lts-13.12/8.6.4/bin/'
 
   - job: WindowsTest
@@ -43,7 +43,7 @@ jobs:
       - script: choco install haskell-stack
         displayName: Install stack
 
-      - script: stack build --pedantic --flag fake-json:-static
+      - script: stack build --pedantic --flag mkjson:-static
         displayName: Build
 
       - script: stack test
@@ -51,7 +51,7 @@ jobs:
 
       - task: PublishPipelineArtifact@0
         inputs:
-          artifactName: 'fake-json-windows-x86_64'
+          artifactName: 'mkjson-windows-x86_64'
           targetPath: '.stack-work\install\f33caf5a\bin'
 
   - job: Release
@@ -64,25 +64,25 @@ jobs:
       - script: mkdir -p $(System.DefaultWorkingDirectory)/artifacts/
       - task: DownloadPipelineArtifact@0
         inputs:
-          artifactName: 'fake-json-windows-x86_64'
+          artifactName: 'mkjson-windows-x86_64'
           targetPath: $(System.DefaultWorkingDirectory)/artifacts/
 
       - task: DownloadPipelineArtifact@0
         inputs:
-          artifactName: 'fake-json-osx-x86_64'
+          artifactName: 'mkjson-osx-x86_64'
           targetPath: $(System.DefaultWorkingDirectory)/artifacts/
-      - script: mv $(System.DefaultWorkingDirectory)/artifacts/fake-json{,-osx-x86_64}
+      - script: mv $(System.DefaultWorkingDirectory)/artifacts/mkjson{,-osx-x86_64}
 
       - task: DownloadPipelineArtifact@0
         inputs:
-          artifactName: 'fake-json-linux-x86_64'
+          artifactName: 'mkjson-linux-x86_64'
           targetPath: $(System.DefaultWorkingDirectory)/artifacts/
-      - script: mv $(System.DefaultWorkingDirectory)/artifacts/fake-json{,-linux-x86_64}
+      - script: mv $(System.DefaultWorkingDirectory)/artifacts/mkjson{,-linux-x86_64}
 
       - task: GithubRelease@0
         inputs:
           gitHubConnection: 'GitHub connection'
-          repositoryName: mfussenegger/fake-json
+          repositoryName: mfussenegger/mkjson
           target: '$(build.sourceVersion)'
           assets: $(System.DefaultWorkingDirectory)/artifacts/*
           tagSource: 'auto'
