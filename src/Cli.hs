@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Cli
   ( Args(..)
@@ -6,13 +8,22 @@ module Cli
   ) where
 
 
+import           Data.Bifunctor      (bimap)
+import qualified Data.Text           as T
+import qualified Expr                as E
 import           Options.Applicative hiding (Const)
 import           Text.Read           (readMaybe)
 
 
+type Field = (T.Text, E.Expr)
+
+
 data Args = Args
-  { seed :: !(Maybe Int)
-  , num :: !Amount }
+  { seed   :: !(Maybe Int)
+  , num    :: !Amount
+  , fields :: ![Field] }
+  deriving (Show)
+
 
 data Amount = Const Int
             | Infinite
@@ -28,6 +39,15 @@ parseNum = eitherReader parseNum'
       Nothing  -> Left "Expected a number or `Inf` for infinite records"
 
 
+parseExpr :: String -> Either String Field
+parseExpr s =
+  case parts of
+    [field, expr] -> bimap show (field ,) (E.parseExpr expr)
+    _             -> Left "Field must be in <name>=<expr> format"
+  where
+    parts = T.splitOn "=" (T.pack s)
+
+
 args :: Parser Args
 args = Args
   <$> optional 
@@ -39,6 +59,8 @@ args = Args
     ( long "num"
     <> value (Const 1)
     <> help "Number of records to generate. Use `Inf` for infinite records" )
+  <*> many (argument (eitherReader parseExpr) (metavar "FIELDS..."))
+    
 
 
 parseArgs :: [String] -> IO Args
