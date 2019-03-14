@@ -48,9 +48,30 @@ parseExpr s =
     parts = T.splitOn "=" (T.pack s)
 
 
+-- | Generate field completions
+--
+-- >>> completeField "x=randomI"
+-- ["randomInt("]
+--
+-- >>> completeField "x"
+-- ["="]
+completeField :: String -> [String]
+completeField prefix =
+  case parts of
+    [_, suffix] -> map T.unpack $ filter (T.isPrefixOf suffix) providers
+    [_]         -> ["="]
+    _           -> []
+  where
+    prefix' = T.pack prefix
+    parts = T.splitOn "=" prefix'
+    providers =
+      [ "randomInt("
+      , "randomBoolean()" ]
+
+
 args :: Parser Args
 args = Args
-  <$> optional 
+  <$> optional
     ( option auto
       ( long "seed"
       <> help "A seed for the random data generator"
@@ -59,13 +80,14 @@ args = Args
     ( long "num"
     <> value (Const 1)
     <> help "Number of records to generate. Use `Inf` for infinite records" )
-  <*> many (argument (eitherReader parseExpr) (metavar "FIELDS..."))
-    
+  <*> many (argument (eitherReader parseExpr)
+    ( completer (mkCompleter (idm completeField))
+    <> metavar "FIELDS..."
+    <> help "The fields the records should have in <fieldName>=<expression> format." ))
 
 
-parseArgs :: [String] -> IO Args
-parseArgs cliArgs = handleParseResult $ execParserPure defaultPrefs opts cliArgs
+parseArgs :: IO Args
+parseArgs = execParser opts
   where
     opts = info (args <**> helper)
-      ( fullDesc <> progDesc 
-      "Generate random JSON records. Use <field>=<provider> pairs to specify the fields the records should have." )
+      ( fullDesc <> progDesc "Generate (random) JSON records" )

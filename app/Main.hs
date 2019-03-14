@@ -7,18 +7,16 @@ import           Control.Monad.IO.Class     (liftIO)
 import           Data.Aeson                 (encode, object)
 import qualified Data.ByteString.Lazy.Char8 as BL
 import           Fake                       (eval, runFakeT)
-import           System.Environment         (getArgs)
 
 
 main :: IO ()
 main = do
-  args <- getArgs
-  parsedArgs <- Cli.parseArgs args
+  args <- Cli.parseArgs
   let
-    fields = fmap (\(x, y) -> (x, eval y)) (Cli.fields parsedArgs)
-    printRecords = loop (Cli.num parsedArgs) $
+    fields = fmap (\(x, y) -> (x, eval y)) (Cli.fields args)
+    printRecords = loop (Cli.num args) $
       mapM evalField fields >>= liftIO . BL.putStrLn . encode . object
-  runFakeT (Cli.seed parsedArgs) printRecords >> pure ()
+  runFakeT (Cli.seed args) printRecords >> pure ()
   where
     loop Cli.Infinite  = forever
     loop (Cli.Const n) = replicateM n
