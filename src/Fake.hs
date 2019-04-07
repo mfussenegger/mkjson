@@ -354,8 +354,7 @@ eval :: Expr -> Fake Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
 eval (DoubleLiteral x) = pure $ Number x
-eval (ObjectLiteral s) = pure $ s
-eval (ArrayLiteral a) = pure $ a
+eval (JsonLiteral s) = pure $ s
 eval (FunctionCall (Function "uuid4" [])) = String . UUID.toText <$> State.state random
 eval (FunctionCall (Function "uuid1" [])) = String . UUID.toText <$> liftIO uuid1
 eval (FunctionCall (Function "ulid" [])) = getUlid

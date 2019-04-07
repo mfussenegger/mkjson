@@ -21,8 +21,7 @@ import           Text.Parsec.Text        (Parser)
 data Expr = IntLiteral !Integer
           | DoubleLiteral !Scientific
           | StringLiteral !Text
-          | ObjectLiteral !Value
-          | ArrayLiteral !Value
+          | JsonLiteral !Value
           | FunctionCall !Function
           deriving (Show, Eq)
 
@@ -52,13 +51,12 @@ showExpr :: Expr -> Text
 showExpr (StringLiteral s) = "\"" <> s <> "\""
 showExpr (IntLiteral n)    = T.pack . show $ n
 showExpr (DoubleLiteral n) = T.pack . show $ n
-showExpr (ObjectLiteral s)   = TL.toStrict . TL.decodeUtf8 $ encode s
-showExpr (ArrayLiteral a)   = TL.toStrict . TL.decodeUtf8 $ encode a
+showExpr (JsonLiteral s)   = TL.toStrict . TL.decodeUtf8 $ encode s
 showExpr (FunctionCall _)  = error "Can only convert literals to text representation"
 
 
 objectLiteral :: Parser Expr
-objectLiteral = jsonLiteral '{' assignment '}' ObjectLiteral
+objectLiteral = jsonLiteral '{' assignment '}'
   where
     colon = char ':' >> spaces
     assignment = do
@@ -69,19 +67,19 @@ objectLiteral = jsonLiteral '{' assignment '}' ObjectLiteral
 
 
 arrayLiteral :: Parser Expr
-arrayLiteral = jsonLiteral '[' element ']' ArrayLiteral
+arrayLiteral = jsonLiteral '[' element ']'
   where
     element = showExpr <$> literal
 
 
-jsonLiteral :: Char -> Parser Text -> Char -> (Value -> Expr) -> Parser Expr
-jsonLiteral open element end ctor = do
+jsonLiteral :: Char -> Parser Text -> Char -> Parser Expr
+jsonLiteral open element end = do
   elements <- between (char open) (char end) (element `sepBy` comma)
   let
     str = T.singleton open <> T.intercalate ", " elements <> T.singleton end
   case decode' (TL.encodeUtf8 . TL.fromStrict $ str) of
     Nothing -> error $ "Invalid JSON string: " <> T.unpack str
-    Just v  -> pure $ ctor v
+    Just v  -> pure $ JsonLiteral v
   where
     comma = char ',' >> spaces
 
@@ -151,12 +149,12 @@ ident = do
 -- Right (StringLiteral "")
 --
 -- >>> parseExpr "{}"
--- Right (ObjectLiteral (Object (fromList [])))
+-- Right (JsonLiteral (Object (fromList [])))
 --
 -- >>> parseExpr "{\"x\": 10, \"y\": {}}"
--- Right (ObjectLiteral (Object (fromList [("x",Number 10.0),("y",Object (fromList []))])))
+-- Right (JsonLiteral (Object (fromList [("x",Number 10.0),("y",Object (fromList []))])))
 --
 -- >>> parseExpr "[10, 20, 30]"
--- Right (ArrayLiteral (Array [Number 10.0,Number 20.0,Number 30.0]))
+-- Right (JsonLiteral (Array [Number 10.0,Number 20.0,Number 30.0]))
 parseExpr :: Text -> Either ParseError Expr
 parseExpr = parse expr "(unknown)"
