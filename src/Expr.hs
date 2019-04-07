@@ -58,33 +58,31 @@ showExpr (FunctionCall _)  = error "Can only convert literals to text representa
 
 
 objectLiteral :: Parser Expr
-objectLiteral = do
-  assignments <- between (char '{') (char '}') (assignment `sepBy` comma)
-  let
-    objStr = "{" <> T.intercalate ", " assignments <> "}"
-  case decode' (TL.encodeUtf8 . TL.fromStrict $ objStr) of
-    Nothing -> error $ "Invalid JSON string: " <> T.unpack objStr
-    Just v  -> pure $ ObjectLiteral v
+objectLiteral = jsonLiteral '{' assignment '}' ObjectLiteral
   where
+    colon = char ':' >> spaces
     assignment = do
       key <- stringLiteral 
       _ <- colon
       value <- literal
       pure $ showExpr key <> ": " <> showExpr value
-    colon = char ':' >> spaces
-    comma = char ',' >> spaces
 
 
 arrayLiteral :: Parser Expr
-arrayLiteral = do
-  elements <- between (char '[') (char ']') (element `sepBy` comma)
-  let
-    arrStr = "[" <> T.intercalate ", " elements <> "]"
-  case decode' (TL.encodeUtf8 . TL.fromStrict $ arrStr) of
-    Nothing -> error $ "Invalid JSON string: " <> T.unpack arrStr
-    Just v  -> pure $ ArrayLiteral v
+arrayLiteral = jsonLiteral '[' element ']' ArrayLiteral
   where
     element = showExpr <$> literal
+
+
+jsonLiteral :: Char -> Parser Text -> Char -> (Value -> Expr) -> Parser Expr
+jsonLiteral open element end ctor = do
+  elements <- between (char open) (char end) (element `sepBy` comma)
+  let
+    str = T.singleton open <> T.intercalate ", " elements <> T.singleton end
+  case decode' (TL.encodeUtf8 . TL.fromStrict $ str) of
+    Nothing -> error $ "Invalid JSON string: " <> T.unpack str
+    Just v  -> pure $ ctor v
+  where
     comma = char ',' >> spaces
 
 
