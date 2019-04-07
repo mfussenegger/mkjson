@@ -51,6 +51,30 @@ To generate infinite records, use:
  - fromFile(fileName)
  - fromRegex(pattern)
 
+### Examples
+
+Using `fromFile` and `oneOf`:
+
+```
+↪  mkjson --num 3 w="oneOf(fromFile('/usr/share/dict/words'))"
+{"w":"Karl"}
+{"w":"demographic"}
+{"w":"calumny's"}
+```
+
+Nesting calls to create objects:
+
+```
+↪  mkjson obj=$(mkjson xs="array(randomInt(0, 4), randomInt(5, 9))")
+{"obj":{"xs":[2,5]}}
+```
+
+Using `object` with various providers:
+
+```
+↪  mkjson obj="object(dt, randomDateTime(), type, fromRegex('[a-z]{4}-\d+'), xs, replicate(5, randomInt(0, 10)))"
+{"obj":{"dt":"2099-09-11T16:33:41Z","xs":[6,8,5,2,0],"type":"ldwa-2667786160"}}
+```
 
 ## Installation
 
