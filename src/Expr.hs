@@ -3,6 +3,7 @@
 module Expr where
 
 import           Data.Aeson              (Value (..), decode', encode)
+import           Data.Maybe              (fromMaybe)
 import           Data.Scientific         (Scientific)
 import           Data.String             (IsString (..))
 import           Data.Text               (Text)
@@ -86,15 +87,16 @@ jsonLiteral open element end = do
 
 number :: Parser Expr
 number = do
+  sign <- fromMaybe ' ' <$> optionMaybe (plus <|> minus)
   integer <- many1 digit
-  optionalDot <- optionMaybe (char '.')
-  case optionalDot of
-    Nothing  -> pure $ IntLiteral (read integer)
-    (Just _) -> do
-      fractional <- many digit
-      let
-        value = read $ integer <> "." <> fractional
-      pure $ DoubleLiteral value
+  fractional <- optionMaybe fract
+  case fractional of
+    Nothing            -> pure $ IntLiteral $ read ([sign] <> integer)
+    (Just fractional') -> pure $ DoubleLiteral $ read $ [sign] <> integer <> "." <> fractional'
+  where
+    fract = char '.' >> many digit
+    plus = char '+' <* spaces
+    minus = char '-' <* spaces
 
 
 stringLiteral :: Parser Expr
@@ -129,6 +131,9 @@ ident = do
 --
 -- >>> parseExpr "20"
 -- Right (IntLiteral 20)
+--
+-- >>> parseExpr "-20"
+-- Right (IntLiteral (-20))
 --
 -- >>> parseExpr "20.3"
 -- Right (DoubleLiteral 20.3)
