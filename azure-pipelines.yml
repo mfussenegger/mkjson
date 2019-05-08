@@ -16,7 +16,7 @@ jobs:
       - task: PublishPipelineArtifact@0
         inputs:
           artifactName: 'mkjson-linux-x86_64'
-          targetPath: '.stack-work/install/x86_64-linux/lts-13.12/8.6.4/bin/'
+          targetPath: '.stack-work/install/x86_64-linux/lts-13.20/8.6.5/bin/'
 
   - job: MacOSTest
     pool:
@@ -34,7 +34,7 @@ jobs:
       - task: PublishPipelineArtifact@0
         inputs:
           artifactName: 'mkjson-osx-x86_64'
-          targetPath: '.stack-work/install/x86_64-osx/lts-13.12/8.6.4/bin/'
+          targetPath: '.stack-work/install/x86_64-osx/lts-13.20/8.6.5/bin/'
 
   - job: WindowsTest
     pool:
@@ -52,7 +52,7 @@ jobs:
       - task: PublishPipelineArtifact@0
         inputs:
           artifactName: 'mkjson-windows-x86_64'
-          targetPath: '.stack-work\install\f33caf5a\bin'
+          targetPath: '.stack-work\install\d0f5f7d8\bin'
 
   - job: Release
     dependsOn:
