@@ -7,16 +7,15 @@ jobs:
       - script: curl -sSL https://get.haskellstack.org/ | sh
         displayName: Install stack
 
-      - script: stack build --pedantic --flag mkjson:-static
-        displayName: Build
-
-      - script: stack test
+      - script: |
+          echo '##vso[task.setvariable variable=mkjson_install_root]'$(stack path --local-install-root)
+          stack build --pedantic --flag mkjson:-static --test
         displayName: Run tests
 
       - task: PublishPipelineArtifact@0
         inputs:
           artifactName: 'mkjson-linux-x86_64'
-          targetPath: '.stack-work/install/x86_64-linux/lts-13.20/8.6.5/bin/'
+          targetPath: '$(MKJSON_INSTALL_ROOT)/bin/'
 
   - job: MacOSTest
     pool:
@@ -25,16 +24,14 @@ jobs:
       - script: curl -sSL https://get.haskellstack.org/ | sh
         displayName: Install stack
 
-      - script: stack build --pedantic --flag mkjson:-static
-        displayName: Build
-
-      - script: stack test
-        displayName: Run tests
+      - script: |
+          echo '##vso[task.setvariable variable=mkjson_install_root]'$(stack path --local-install-root)
+          stack build --pedantic --flag mkjson:-static --test
 
       - task: PublishPipelineArtifact@0
         inputs:
           artifactName: 'mkjson-osx-x86_64'
-          targetPath: '.stack-work/install/x86_64-osx/lts-13.20/8.6.5/bin/'
+          targetPath: '$(MKJSON_INSTALL_ROOT)/bin/'
 
   - job: WindowsTest
     pool:
@@ -43,16 +40,13 @@ jobs:
       - script: choco install haskell-stack
         displayName: Install stack
 
-      - script: stack build --pedantic --flag mkjson:-static
-        displayName: Build
-
-      - script: stack test
+      - script: stack build --pedantic --flag mkjson:-static --test --copy-bins
         displayName: Run tests
 
       - task: PublishPipelineArtifact@0
         inputs:
           artifactName: 'mkjson-windows-x86_64'
-          targetPath: '.stack-work\install\d0f5f7d8\bin'
+          targetPath: '$(AppData)\local\bin\'
 
   - job: Release
     dependsOn:
