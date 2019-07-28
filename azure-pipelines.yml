@@ -4,6 +4,20 @@ jobs:
     pool:
       vmImage: 'Ubuntu 16.04'
     steps:
+      - task: CacheBeta@0
+        inputs:
+          key: $(Agent.OS)
+          path: $(HOME)/.stack
+        displayName: Cache stack
+
+      - task: CacheBeta@0
+        inputs:
+          key: |
+            $(Agent.OS)
+            $(Build.SourcesDirectory)/stack.yaml.lock
+          path: .stack-work
+        displayName: Cache stack-work
+
       - script: curl -sSL https://get.haskellstack.org/ | sh
         displayName: Install stack
 
@@ -21,6 +35,20 @@ jobs:
     pool:
       vmImage: 'macOS-10.13'
     steps:
+      - task: CacheBeta@0
+        inputs:
+          key: $(Agent.OS)
+          path: $(HOME)/.stack
+        displayName: Cache stack
+
+      - task: CacheBeta@0
+        inputs:
+          key: |
+            $(Agent.OS)
+            $(Build.SourcesDirectory)/stack.yaml.lock
+          path: .stack-work
+        displayName: Cache stack-work
+
       - script: curl -sSL https://get.haskellstack.org/ | sh
         displayName: Install stack
 
@@ -37,6 +65,20 @@ jobs:
     pool:
       vmImage: 'VS2017-Win2016'
     steps:
+      - task: CacheBeta@0
+        inputs:
+          key: $(Agent.OS)
+          path: $(AppData)/stack
+        displayName: Cache stack
+
+      - task: CacheBeta@0
+        inputs:
+          key: |
+            $(Agent.OS)
+            $(Build.SourcesDirectory)/stack.yaml.lock
+          path: .stack-work
+        displayName: Cache stack-work
+
       - script: choco install haskell-stack
         displayName: Install stack
 
