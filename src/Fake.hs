@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module Fake (
   State,
@@ -37,7 +38,7 @@ import           Data.ULID.TimeStamp        (getULIDTimeStamp)
 import qualified Data.UUID                  as UUID
 import qualified Data.UUID.V1               as UUID1
 import qualified Data.Vector                as V
-import           Expr                       (Expr (..), Function (..))
+import           Expr                       (Expr (..), pattern Fn, Function (..))
 import           Prelude                    hiding (lines, replicate)
 import           System.Random              (Random (..), RandomGen (..),
                                              StdGen, mkStdGen, newStdGen)
@@ -84,7 +85,7 @@ instance RandomGen Env where
 
 newEnv :: Maybe Int -> IO Env
 newEnv (Just seed) = pure $ Env (mkStdGen seed) M.empty
-newEnv Nothing     = (flip Env) M.empty <$> newStdGen
+newEnv Nothing     = flip Env M.empty <$> newStdGen
 
 
 uuid1 :: IO UUID.UUID
@@ -172,7 +173,7 @@ objectFromArgs :: [Expr] -> Fake Value
 objectFromArgs args = do
   let
     pairs = fmap (fmap mkKeyValuePair) (mkPairs args)
-  Except.liftEither pairs >>= mapM id <&> object
+  Except.liftEither pairs >>= sequence <&> object
   where
     mkPairs [] = Right []
     mkPairs [_] = Left "Arguments to object must be a multiple of 2 (key + value pairs)"
@@ -223,35 +224,34 @@ fromRegex :: (RandomGen g, MonadState g m, MonadError String m)
           -> m T.Text
 fromRegex input =
   case R.parseRegex input' of
-    Right (pattern, _) -> generateText pattern
+    Right (pattern', _) -> generateText pattern'
     Left err           -> Except.throwError $ show err
   where
     input' = T.unpack input
     defaultUpper = 10
-    replicatePattern lower upper pattern = do
+    replicatePattern lower upper pattern' = do
       numChars <- State.state $ randomR (lower, upper)
-      T.concat <$> replicateM numChars (generateText pattern)
+      T.concat <$> replicateM numChars (generateText pattern')
     generateText p = case p of
       (R.POr patterns) -> do
-        pattern <- rndListItem patterns
-        case pattern of
-          Nothing       -> pure $ ""
-          Just pattern' -> generateText pattern'
+        pattern' <- rndListItem patterns
+        case pattern' of
+          Nothing       -> pure ""
+          Just pattern'' -> generateText pattern''
       (R.PConcat patterns) -> T.concat <$> mapM generateText patterns
-      (R.PPlus pattern) -> replicatePattern 1 defaultUpper pattern
-      (R.PStar _ pattern) -> replicatePattern 0 defaultUpper pattern
-      (R.PBound lower mUpper pattern) -> do
-        replicatePattern lower (fromMaybe defaultUpper mUpper) pattern
+      (R.PPlus pattern') -> replicatePattern 1 defaultUpper pattern'
+      (R.PStar _ pattern') -> replicatePattern 0 defaultUpper pattern'
+      (R.PBound lower mUpper pattern') ->
+        replicatePattern lower (fromMaybe defaultUpper mUpper) pattern'
       (R.PAny _ patternSet) -> fromPatternSet patternSet
-      (R.PAnyNot _ ps@(R.PatternSet mChars _ _ _)) -> do
+      (R.PAnyNot _ ps@(R.PatternSet mChars _ _ _)) ->
         rndSetItem (maybe Set.empty (Set.difference allPossibleChars) mChars)
         >>= maybeMErr ("Can't generate data from regex pattern" <> show ps)
         <&> charToText
-      (R.PEscape _ 'd') -> do
-        T.pack . show <$> (State.state $ randomR (0, 9 :: Int))
+      (R.PEscape _ 'd') -> T.pack . show <$> State.state (randomR (0, 9 :: Int))
       (R.PChar _ char) -> pure $ charToText char
       _ -> Except.throwError $ "Can't generate data from regex pattern" <> show p
-    fromPatternSet ps@(R.PatternSet mCharSet _ _ _) = do
+    fromPatternSet ps@(R.PatternSet mCharSet _ _ _) =
       rndSetItem (fromMaybe Set.empty mCharSet)
       >>= maybeMErr ("Can't generate data from regex pattern" <> show ps)
       <&> charToText
@@ -354,33 +354,33 @@ eval :: Expr -> Fake Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
 eval (StringLiteral x) = pure $ String x
 eval (DoubleLiteral x) = pure $ Number x
-eval (JsonLiteral s) = pure $ s
-eval (FunctionCall (Function "uuid4" [])) = String . UUID.toText <$> State.state random
-eval (FunctionCall (Function "uuid1" [])) = String . UUID.toText <$> liftIO uuid1
-eval (FunctionCall (Function "ulid" [])) = getUlid
-eval (FunctionCall (Function "null" [])) = pure Null
-eval (FunctionCall (Function "randomBool" [])) = randomBool
-eval (FunctionCall (Function "randomChar" [])) = randomChar
-eval (FunctionCall (Function "randomInt" [])) = randomInt (IntLiteral 0) (IntLiteral 2147483647)
-eval (FunctionCall (Function "randomInt" [upper])) = randomInt (IntLiteral 0) upper
-eval (FunctionCall (Function "randomInt" [lower, upper])) = randomInt lower upper
-eval (FunctionCall (Function "randomDouble" [])) = randomDouble (DoubleLiteral 0) (DoubleLiteral 1.7976931348623157E308)
-eval (FunctionCall (Function "randomDouble" [upper])) = randomDouble (DoubleLiteral 0) upper
-eval (FunctionCall (Function "randomDouble" [lower, upper])) = randomDouble lower upper
-eval (FunctionCall (Function "randomDate" [])) = dayAsValue <$> randomDate Nothing Nothing
-eval (FunctionCall (Function "randomDate" [lower, upper])) = do
+eval (JsonLiteral s) = pure s
+eval (Fn "uuid4" []) = String . UUID.toText <$> State.state random
+eval (Fn "uuid1" []) = String . UUID.toText <$> liftIO uuid1
+eval (Fn "ulid" []) = getUlid
+eval (Fn "null" []) = pure Null
+eval (Fn "randomBool" []) = randomBool
+eval (Fn "randomChar" []) = randomChar
+eval (Fn "randomInt" []) = randomInt (IntLiteral 0) (IntLiteral 2147483647)
+eval (Fn "randomInt" [upper]) = randomInt (IntLiteral 0) upper
+eval (Fn "randomInt" [lower, upper]) = randomInt lower upper
+eval (Fn "randomDouble" []) = randomDouble (DoubleLiteral 0) (DoubleLiteral 1.7976931348623157E308)
+eval (Fn "randomDouble" [upper]) = randomDouble (DoubleLiteral 0) upper
+eval (Fn "randomDouble" [lower, upper]) = randomDouble lower upper
+eval (Fn "randomDate" []) = dayAsValue <$> randomDate Nothing Nothing
+eval (Fn "randomDate" [lower, upper]) = do
   lo <- A.asText <$> eval lower
   hi <- A.asText <$> eval upper
   dayAsValue <$> randomDate (rightToMaybe lo) (rightToMaybe hi)
-eval (FunctionCall (Function "randomDateTime" [])) = randomDateTime
-eval (FunctionCall (Function "array" args)) = Array . V.fromList <$> mapM eval args
-eval (FunctionCall (Function "oneOf" [arg])) = oneOfArray arg
-eval (FunctionCall (Function "oneOf" args)) = oneOfArgs args
-eval (FunctionCall (Function "replicate" [num, expr])) = replicate num expr
-eval (FunctionCall (Function "object" args)) = objectFromArgs args
-eval (FunctionCall (Function "fromFile" [fileName])) = fromFile fileName
-eval (FunctionCall (Function "fromRegex" [pattern])) =
-  eval pattern
+eval (Fn "randomDateTime" []) = randomDateTime
+eval (Fn "array" args) = Array . V.fromList <$> mapM eval args
+eval (Fn "oneOf" [arg]) = oneOfArray arg
+eval (Fn "oneOf" args) = oneOfArgs args
+eval (Fn "replicate" [num, expr]) = replicate num expr
+eval (Fn "object" args) = objectFromArgs args
+eval (Fn "fromFile" [fileName]) = fromFile fileName
+eval (Fn "fromRegex" [pattern']) =
+  eval pattern'
   <&> A.asText
   >>= Except.liftEither
   >>= Fake . fromRegex

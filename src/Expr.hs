@@ -1,6 +1,12 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Expr where
+module Expr
+  ( parseExpr
+  , Expr (..)
+  , Function (..)
+  , pattern Fn
+  ) where
 
 import           Data.Aeson              (Value (..), decode', encode)
 import           Data.Maybe              (fromMaybe)
@@ -31,6 +37,10 @@ data Function = Function
   { fcName :: !Text
   , fcArgs :: ![Expr] }
   deriving (Show, Eq)
+
+
+pattern Fn :: T.Text -> [Expr] -> Expr
+pattern Fn name args = FunctionCall (Function name args)
 
 
 instance IsString Expr where

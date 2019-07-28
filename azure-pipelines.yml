@@ -6,7 +6,9 @@ jobs:
     steps:
       - task: CacheBeta@0
         inputs:
-          key: $(Agent.OS)
+          key: |
+            $(Agent.OS)
+            $(Build.SourcesDirectory)/stack.yaml.lock
           path: $(HOME)/.stack
         displayName: Cache stack
 
@@ -37,7 +39,9 @@ jobs:
     steps:
       - task: CacheBeta@0
         inputs:
-          key: $(Agent.OS)
+          key: |
+            $(Agent.OS)
+            $(Build.SourcesDirectory)/stack.yaml.lock
           path: $(HOME)/.stack
         displayName: Cache stack
 
@@ -67,7 +71,9 @@ jobs:
     steps:
       - task: CacheBeta@0
         inputs:
-          key: $(Agent.OS)
+          key: |
+            $(Agent.OS)
+            $(Build.SourcesDirectory)/stack.yaml.lock
           path: $(AppData)/stack
         displayName: Cache stack
 
