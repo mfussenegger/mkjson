@@ -43,6 +43,7 @@ parseExpr :: String -> Either String Field
 parseExpr s =
   case parts of
     [field, expr] -> bimap show (field ,) (E.parseExpr expr)
+    [field]       -> bimap show (field ,) (E.parseExpr "null()")
     _             -> Left "Field must be in <name>=<expr> format"
   where
     parts = T.splitOn "=" (T.pack s)
