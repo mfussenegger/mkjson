@@ -95,3 +95,12 @@ git clone https://github.com/mfussenegger/mkjson.git
 cd mkjson
 stack install
 ```
+
+
+## Alternatives
+
+There are some alternatives if you're not so interested in the random-value
+generation aspect of `mkjson`:
+
+ - [jarg](https://github.com/jdp/jarg)
+ - [jo](https://github.com/jpmens/jo)
