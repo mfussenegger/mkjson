@@ -23,13 +23,15 @@ import           Data.Aeson                 (Value (..), object)
 import qualified Data.ByteString.Char8      as BS
 import           Data.Functor               ((<&>))
 import qualified Data.HashMap.Strict        as M
-import           Data.Maybe                 (fromMaybe)
+import           Data.Maybe                 (catMaybes, fromMaybe, listToMaybe)
 import qualified Data.Scientific            as S
 import qualified Data.Set                   as Set
 import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as T
 import           Data.Time.Calendar         (Day (..), showGregorian)
-import           Data.Time.Clock            (UTCTime (..), secondsToDiffTime)
+import           Data.Time.Clock            (UTCTime (..),
+                                             diffTimeToPicoseconds,
+                                             picosecondsToDiffTime)
 import           Data.Time.Format           (defaultTimeLocale, formatTime,
                                              iso8601DateFormat, parseTimeM)
 import qualified Data.ULID                  as ULID
@@ -293,38 +295,86 @@ randomChar = charToString <$> State.state random
 -- >>> exec "randomDate('2001-01-01', '2018-12-31')"
 -- String "2015-03-21"
 --
--- >>> exec "randomDate('2002', '2018-12-31')"
--- *** Exception: user error (parseTimeM: no parse of "2002")
--- ...
 randomDate :: (MonadError String m, RandomGen g, MonadState g m)
            => Maybe T.Text
            -> Maybe T.Text
            -> m Day
-randomDate lo hi = do
-  l <- lo'
-  h <- hi'
-  ModifiedJulianDay <$> State.state (randomR (l, h))
+randomDate lo hi = randomDate' lo' hi'
   where
-    defaultLo = pure $ ModifiedJulianDay 0
-    defaultHi = pure $ ModifiedJulianDay 100000
-    lo' = toModifiedJulianDay <$> maybe defaultLo parseDay lo
-    hi' = toModifiedJulianDay <$> maybe defaultHi parseDay hi
+    lo' = lo >>= parseDay
+    hi' = hi >>= parseDay
     parseDay = parseTimeM False defaultTimeLocale "%F" . T.unpack
+
+
+randomDate' :: (MonadError String m, RandomGen g,MonadState g m)
+            => Maybe Day
+            -> Maybe Day
+            -> m Day
+randomDate' lo hi = ModifiedJulianDay <$> State.state (randomR (lo', hi'))
+  where
+    lo' = toModifiedJulianDay $ fromMaybe defaultLo lo
+    hi' = toModifiedJulianDay $ fromMaybe defaultHi hi
+    defaultLo = ModifiedJulianDay 0
+    defaultHi = ModifiedJulianDay 100000
 
 
 -- | Generate a random dateTime
 --
 -- >>> exec "randomDateTime()"
--- String "2063-01-23T12:34:50Z"
+-- String "2063-01-23T16:57:46Z"
+--
+-- >>> exec "randomDateTime('2019-10-10', '2019-10-20 17:00')"
+-- String "2019-10-18T09:37:09Z"
+--
+-- >>> exec "randomDateTime('2019-10-10 11:05', '2019-10-10 11:08')"
+-- String "2019-10-10T11:07:52Z"
 randomDateTime :: (MonadError String m, RandomGen g, MonadState g m)
-               => m Value
-randomDateTime = do
-  day <- randomDate Nothing Nothing
-  seconds <- State.state (randomR (0, 86400))
-  pure . String . T.pack . formatDateTime $ UTCTime day (secondsToDiffTime seconds)
+               => Maybe T.Text
+               -> Maybe T.Text
+               -> m Value
+randomDateTime lo hi = do
+  day <- randomDate' loDay hiDay
+  pico <- State.state (randomR (loPico, hiPico))
+  pure . String . T.pack . formatDateTime $ UTCTime day (picosecondsToDiffTime pico)
   where
     formatDateTime = formatTime defaultTimeLocale isoFormat
     isoFormat = iso8601DateFormat (Just "%H:%M:%SZ")
+    lo' = lo >>= parseDateTime
+    hi' = hi >>= parseDateTime
+    loDay = utctDay <$> lo'
+    hiDay = utctDay <$> hi'
+    loPico = maybe 0 (diffTimeToPicoseconds. utctDayTime) lo'
+    hiPico = maybe 86400000000000000 (diffTimeToPicoseconds . utctDayTime) hi'
+
+
+-- | Parse a DateTime formatted in iso8601 where the time part is optional
+--
+-- >>> parseDateTime "2019-10-21"
+-- Just 2019-10-21 00:00:00 UTC
+--
+-- >>> parseDateTime "2019-2-21"
+-- Just 2019-02-21 00:00:00 UTC
+--
+-- >>> parseDateTime "2019-10-21T21:30"
+-- Just 2019-10-21 21:30:00 UTC
+--
+-- >>> parseDateTime "2019-10-21 21:30"
+-- Just 2019-10-21 21:30:00 UTC
+--
+-- >>> parseDateTime "2019-10-21 21:30:59"
+-- Just 2019-10-21 21:30:59 UTC
+parseDateTime :: T.Text -> Maybe UTCTime
+parseDateTime dt = listToMaybe . catMaybes $ fmap parse formats
+  where
+    formats =
+      [ "%Y-%-m-%-d"
+      , "%Y-%-m-%-dT%H:%M"
+      , "%Y-%-m-%-d %H:%M"
+      , "%Y-%-m-%-d %H:%M:%S"
+      ]
+    dt' = T.unpack dt
+    parse :: String -> Maybe UTCTime
+    parse format = parseTimeM True defaultTimeLocale format dt'
 
 
 rightToMaybe :: Either a b -> Maybe b
@@ -372,7 +422,11 @@ eval (Fn "randomDate" [lower, upper]) = do
   lo <- A.asText <$> eval lower
   hi <- A.asText <$> eval upper
   dayAsValue <$> randomDate (rightToMaybe lo) (rightToMaybe hi)
-eval (Fn "randomDateTime" []) = randomDateTime
+eval (Fn "randomDateTime" []) = randomDateTime Nothing Nothing
+eval (Fn "randomDateTime" [lower, upper]) = do
+  lower' <- rightToMaybe . A.asText <$> eval lower
+  upper' <- rightToMaybe . A.asText <$> eval upper
+  randomDateTime lower' upper'
 eval (Fn "array" args) = Array . V.fromList <$> mapM eval args
 eval (Fn "oneOf" [arg]) = oneOfArray arg
 eval (Fn "oneOf" args) = oneOfArgs args
