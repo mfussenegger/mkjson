@@ -20,9 +20,6 @@ jobs:
           path: .stack-work
         displayName: Cache stack-work
 
-      - script: curl -sSL https://get.haskellstack.org/ | sh
-        displayName: Install stack
-
       - script: |
           echo '##vso[task.setvariable variable=mkjson_install_root]'$(stack path --local-install-root)
           stack build --pedantic --flag mkjson:-static --test
