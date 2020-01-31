@@ -221,6 +221,9 @@ maybeMErr _   (Just x) = pure x
 --
 -- >>> exec "fromRegex('[^0-9][0-9]B')"
 -- String "\211735\&4B"
+--
+-- >>> exec "fromRegex('(\\d{4})')"
+-- String "6763"
 fromRegex :: (RandomGen g, MonadState g m, MonadError String m)
           => T.Text
           -> m T.Text
@@ -235,6 +238,7 @@ fromRegex input =
       numChars <- State.state $ randomR (lower, upper)
       T.concat <$> replicateM numChars (generateText pattern')
     generateText p = case p of
+      (R.PGroup _ pattern') -> generateText pattern'
       (R.POr patterns) -> do
         pattern' <- rndListItem patterns
         case pattern' of
@@ -248,14 +252,14 @@ fromRegex input =
       (R.PAny _ patternSet) -> fromPatternSet patternSet
       (R.PAnyNot _ ps@(R.PatternSet mChars _ _ _)) ->
         rndSetItem (maybe Set.empty (Set.difference allPossibleChars) mChars)
-        >>= maybeMErr ("Can't generate data from regex pattern" <> show ps)
+        >>= maybeMErr ("Can't generate data from regex pattern: " <> show ps)
         <&> charToText
       (R.PEscape _ 'd') -> T.pack . show <$> State.state (randomR (0, 9 :: Int))
       (R.PChar _ char) -> pure $ charToText char
-      _ -> Except.throwError $ "Can't generate data from regex pattern" <> show p
+      _ -> Except.throwError $ "Can't generate data from regex pattern: " <> show p
     fromPatternSet ps@(R.PatternSet mCharSet _ _ _) =
       rndSetItem (fromMaybe Set.empty mCharSet)
-      >>= maybeMErr ("Can't generate data from regex pattern" <> show ps)
+      >>= maybeMErr ("Can't generate data from regex pattern: " <> show ps)
       <&> charToText
     charToText c = T.pack [c]
 
