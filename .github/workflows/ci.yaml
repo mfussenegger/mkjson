@@ -1,0 +1,39 @@
+---
+name: CI
+
+on:
+  pull_request: ~
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@master
+
+      - name: Setup Haskell
+        uses: mstksg/setup-stack@v2
+
+      - name: Cache dependencies
+        id: cache
+        uses: actions/cache@v1
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-stack-${{ hashFiles('stack.yaml.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-stack-
+
+      - name: Build snapshot
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          stack --no-terminal build --pedantic --flag mkjson:-static --test --only-snapshot
+
+      - name: Build and test Haskell code
+        run: |
+          stack --no-terminal build --pedantic --flag mkjson:-static --test
