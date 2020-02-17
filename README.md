@@ -35,7 +35,6 @@ To generate infinite records, use:
 
  - uuid1
  - uuid4
- - ulid
  - null
  - randomBool
  - randomChar
