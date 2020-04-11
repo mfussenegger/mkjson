@@ -1,0 +1,110 @@
+cabal-version: 2.4
+name:           mkjson
+version:        0.2.0.0
+description:    Please see the README on GitHub at <https://github.com/mfussenegger/mkjson#readme>
+homepage:       https://github.com/mfussenegger/mkjson#readme
+bug-reports:    https://github.com/mfussenegger/mkjson/issues
+author:         Mathias Fußenegger
+maintainer:     github@zignar.net
+copyright:      2020 Mathias Fußenegger
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/mfussenegger/mkjson
+
+flag static
+  description: Pass -static to ghc when linking the binary.
+  manual: True
+  default: False
+
+
+common deps
+  ghc-options: -Wall -fno-warn-unused-do-bind -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -Wcompat -Widentities -Wredundant-constraints -Wpartial-fields -fhide-source-paths -freverse-errors
+  build-depends:
+      base >=4.7 && <5
+    , aeson
+    , bytestring
+    , containers
+    , mtl
+    , optparse-applicative
+    , parsec
+    , random
+    , regex-tdfa
+    , scientific
+    , text
+    , time
+    , unordered-containers
+    , uuid
+    , vector
+
+
+library
+  import: deps
+  exposed-modules:
+      Aeson
+      Cli
+      Expr
+      Fake
+  other-modules:
+      Paths_mkjson
+  hs-source-dirs:
+      src
+  default-language: Haskell2010
+
+executable mkjson
+  import: deps
+  main-is: Main.hs
+  other-modules:
+      Paths_mkjson
+  hs-source-dirs:
+      app
+  if flag(static)
+    ghc-options: fPIC
+    ld-options: -static
+  build-depends:
+      mkjson
+  default-language: Haskell2010
+
+test-suite mkjson-doctest
+  import: deps
+  type: exitcode-stdio-1.0
+  main-is: doctests.hs
+  other-modules:
+      Paths_mkjson
+  hs-source-dirs:
+      tests
+  build-depends:
+      Glob
+    , doctest
+    , mkjson
+  default-language: Haskell2010
+
+test-suite mkjson-test
+  import: deps
+  type: exitcode-stdio-1.0
+  main-is: spec.hs
+  other-modules:
+      Paths_mkjson
+  hs-source-dirs:
+      tests
+  build-depends:
+      mkjson
+  default-language: Haskell2010
+
+benchmark mkjson-benchmarks
+  import: deps
+  type: exitcode-stdio-1.0
+  main-is: bench.hs
+  other-modules:
+      Paths_mkjson
+  hs-source-dirs:
+      benchmarks
+  build-depends:
+      mkjson
+  default-language: Haskell2010
