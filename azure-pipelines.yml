@@ -2,7 +2,7 @@
 jobs:
   - job: LinuxTest
     pool:
-      vmImage: 'Ubuntu 16.04'
+      vmImage: 'Ubuntu 18.04'
     steps:
       - task: CacheBeta@0
         inputs:
@@ -32,7 +32,7 @@ jobs:
 
   - job: MacOSTest
     pool:
-      vmImage: 'macOS-10.13'
+      vmImage: 'macOS-10.15'
     steps:
       - task: CacheBeta@0
         inputs:
@@ -64,7 +64,7 @@ jobs:
 
   - job: WindowsTest
     pool:
-      vmImage: 'VS2017-Win2016'
+      vmImage: 'windows-2019'
     steps:
       - task: CacheBeta@0
         inputs:
