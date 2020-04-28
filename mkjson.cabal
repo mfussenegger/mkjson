@@ -51,6 +51,7 @@ library
       Cli
       Expr
       Fake
+      ObjectGroups
   other-modules:
       Paths_mkjson
   hs-source-dirs:

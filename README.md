@@ -41,7 +41,7 @@ To generate infinite records, use:
  - randomInt(lower, upper)
  - randomDouble(lower, upper)
  - randomDate [(lower, upper)]
- - randomDateTime 
+ - randomDateTime [(lower, upper)]
  - array(expr [, ...])
  - oneOf(arrayExpr)
  - oneOf(expr, expr [, ...])
@@ -61,14 +61,22 @@ Using `fromFile` and `oneOf`:
 {"w":"calumny's"}
 ```
 
-Nesting calls to create objects:
+
+Use dotted notation to create objects:
+
+```
+↪  mkjson point.x=10 point.y=20
+{"point":{"x":10,"y":20}}
+```
+
+Or nest calls to create objects:
 
 ```
 ↪  mkjson obj=$(mkjson xs="array(randomInt(0, 4), randomInt(5, 9))")
 {"obj":{"xs":[2,5]}}
 ```
 
-Using `object` with various providers:
+Or use the `object` provider with various providers. Argument are `key, value [, ...]` pairs:
 
 ```
 ↪  mkjson obj="object(dt, randomDateTime(), type, fromRegex('[a-z]{4}-\d+'), xs, replicate(5, randomInt(0, 10)))"

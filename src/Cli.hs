@@ -5,6 +5,7 @@ module Cli
   ( Args(..)
   , Amount(..)
   , parseArgs
+  , Field
   ) where
 
 
