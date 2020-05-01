@@ -1,6 +1,6 @@
 cabal-version: 2.4
 name:           mkjson
-version:        0.2.0.0
+version:        0.3.0.0
 description:    Please see the README on GitHub at <https://github.com/mfussenegger/mkjson#readme>
 homepage:       https://github.com/mfussenegger/mkjson#readme
 bug-reports:    https://github.com/mfussenegger/mkjson/issues
