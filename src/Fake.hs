@@ -108,12 +108,12 @@ randomInt lower upper = do
 
 -- | Generate a random double
 --
--- >>> exec "randomDouble(1.5, 3)"
+-- >>> exec "randomDouble(1.5, 3.0)"
 -- Number 1.500000257527587
 randomDouble :: Expr -> Expr -> Fake Value
 randomDouble lower upper = do
-  lower' <- Except.liftEither =<< A.asDouble <$> eval lower
-  upper' <- Except.liftEither =<< A.asDouble <$> eval upper
+  lower' <- Except.liftEither =<< (S.toRealFloat <$>) . A.asScientific <$> eval lower :: Fake Double
+  upper' <- Except.liftEither =<< (S.toRealFloat <$>) . A.asScientific <$> eval upper :: Fake Double
   Number . S.fromFloatDigits <$> State.state (randomR (lower', upper'))
 
 

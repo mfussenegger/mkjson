@@ -2,16 +2,17 @@
 module Aeson (
   asInt,
   asText,
-  asDouble,
+  asScientific,
   asArray
 ) where
 
 
-import           Data.Aeson      (Value (..))
+import Data.Aeson (Value (..))
 import qualified Data.Scientific as S
-import qualified Data.Text       as T
-import qualified Data.Text.Read  as T
-import qualified Data.Vector     as V
+import qualified Data.Text as T
+import qualified Data.Text.Read as T
+import qualified Data.Vector as V
+import Text.Read (readMaybe)
 
 -- | Try to extract an Int from Value
 --
@@ -36,21 +37,20 @@ asInt o          = Left $ "Expected an integer but received: " <> show o
 
 -- | Try to extract a Double from Value
 --
--- >>> asDouble (Number 10.3)
+-- >>> asScientific (Number 10.3)
 -- Right 10.3
 --
--- >>> asDouble (String "10.5")
+-- >>> asScientific (String "10.5")
 -- Right 10.5
 --
--- >>> asDouble (String "foo")
--- Left "Expected a double, but received: foo"
-asDouble :: Value -> Either String Double
-asDouble (Number n) = Right $ S.toRealFloat n
-asDouble (String s) =
-  case T.double s of
-    (Right (n, _)) -> Right n
-    (Left _)       -> Left $ "Expected a double, but received: " <> T.unpack s
-asDouble o          = Left $ "Expected a double, but received: " <> show o
+-- >>> asScientific (String "foo")
+-- Left "Cannot convert `foo` to a number"
+asScientific :: Value -> Either String S.Scientific
+asScientific (Number n) = Right n
+asScientific (String s) = case readMaybe (T.unpack s) of
+  Nothing -> Left $ "Cannot convert `" <> T.unpack s <> "` to a number"
+  Just s' -> Right s'
+asScientific o = Left $ "Expected a number, but received: " <> show o
 
 
 asArray :: Value -> Either String (V.Vector Value)
