@@ -109,4 +109,5 @@ benchmark mkjson-benchmarks
       benchmarks
   build-depends:
       mkjson
+    , criterion
   default-language: Haskell2010
