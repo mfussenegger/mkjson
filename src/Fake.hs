@@ -1,48 +1,58 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PatternSynonyms #-}
 
-module Fake (
-  State,
-  Env(..),
-  eval,
-  runFakeT
-) where
+module Fake
+  ( State,
+    Env (..),
+    eval,
+    runFakeT,
+  )
+where
 
-import qualified Aeson                      as A
-import           Control.Monad              (replicateM)
-import           Control.Monad.Except       (ExceptT, MonadError)
-import qualified Control.Monad.Except       as Except
-import           Control.Monad.IO.Class     (MonadIO, liftIO)
-import           Control.Monad.State.Class  (MonadState)
-import           Control.Monad.State.Strict (StateT)
+import qualified Aeson as A
+import Control.Monad (replicateM)
+import Control.Monad.Except (ExceptT, MonadError)
+import qualified Control.Monad.Except as Except
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.State.Class (MonadState)
+import Control.Monad.State.Strict (StateT)
 import qualified Control.Monad.State.Strict as State
-import           Data.Aeson                 (Value (..), object)
-import qualified Data.ByteString.Char8      as BS
-import           Data.Functor               ((<&>))
-import qualified Data.HashMap.Strict        as M
-import           Data.Maybe                 (catMaybes, fromMaybe, listToMaybe)
-import qualified Data.Scientific            as S
-import qualified Data.Set                   as Set
-import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as T
-import           Data.Time.Calendar         (Day (..), showGregorian)
-import           Data.Time.Clock            (UTCTime (..),
-                                             diffTimeToPicoseconds,
-                                             picosecondsToDiffTime)
-import           Data.Time.Format           (defaultTimeLocale, formatTime,
-                                             iso8601DateFormat, parseTimeM)
-import qualified Data.UUID                  as UUID
-import qualified Data.UUID.V1               as UUID1
-import qualified Data.Vector                as V
-import           Expr                       (Expr (..), pattern Fn, Function (..))
-import           Prelude                    hiding (lines, replicate)
-import           System.Random              (Random (..), RandomGen (..),
-                                             StdGen, mkStdGen, newStdGen)
-import qualified Text.Regex.TDFA.Pattern    as R
-import qualified Text.Regex.TDFA.ReadRegex  as R
+import Data.Aeson (Value (..), object)
+import qualified Data.ByteString.Char8 as BS
+import Data.Functor ((<&>))
+import qualified Data.HashMap.Strict as M
+import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
+import qualified Data.Scientific as S
+import qualified Data.Set as Set
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import Data.Time.Calendar (Day (..), showGregorian)
+import Data.Time.Clock
+  ( UTCTime (..),
+    diffTimeToPicoseconds,
+    picosecondsToDiffTime,
+  )
+import Data.Time.Format
+  ( defaultTimeLocale,
+    formatTime,
+    iso8601DateFormat,
+    parseTimeM,
+  )
+import qualified Data.UUID as UUID
+import qualified Data.UUID.V1 as UUID1
+import qualified Data.Vector as V
+import Expr (Expr (..), Function (..), pattern Fn)
+import System.Random
+  ( Random (..),
+    RandomGen (..),
+  )
+import qualified System.Random.Mersenne.Pure64 as Rnd
+import qualified Text.Regex.TDFA.Pattern as R
+import qualified Text.Regex.TDFA.ReadRegex as R
+import Prelude hiding (lines, replicate)
 
 
 -- $setup
@@ -71,7 +81,7 @@ runFakeT seed fake = do
 type State a = StateT Env IO a
 
 data Env = Env
-  { envStdGen :: !StdGen
+  { envStdGen :: !Rnd.PureMT
   , envFileCache :: !(M.HashMap T.Text (V.Vector Value)) }
 
 instance RandomGen Env where
@@ -83,8 +93,8 @@ instance RandomGen Env where
       (g', g'') = split (envStdGen env)
 
 newEnv :: Maybe Int -> IO Env
-newEnv (Just seed) = pure $ Env (mkStdGen seed) M.empty
-newEnv Nothing     = flip Env M.empty <$> newStdGen
+newEnv (Just seed) = pure $ Env (Rnd.pureMT (fromIntegral seed)) M.empty
+newEnv Nothing     = flip Env M.empty <$> Rnd.newPureMT
 
 
 uuid1 :: IO UUID.UUID
@@ -109,7 +119,10 @@ randomInt lower upper = do
 -- | Generate a random double
 --
 -- >>> exec "randomDouble(1.5, 3.0)"
--- Number 1.500000257527587
+-- Number 2.04241571695796
+--
+-- >>> exec "randomDouble(1.5, 88.0)"
+-- Number 32.779306344575716
 randomDouble :: Expr -> Expr -> Fake Value
 randomDouble lower upper = do
   lower' <- Except.liftEither =<< (S.toRealFloat <$>) . A.asScientific <$> eval lower :: Fake Double
@@ -128,7 +141,7 @@ randomBool = Bool <$> State.state random
 -- | Select one random item of an array
 --
 -- >>> exec "oneOf(array(37, 42, 21))"
--- Number 21.0
+-- Number 42.0
 oneOfArray :: Expr -> Fake Value
 oneOfArray arr = do
   arr' <- Except.liftEither =<< A.asArray <$> eval arr
@@ -139,7 +152,7 @@ oneOfArray arr = do
 -- | Select one random argument
 --
 -- >>> exec "oneOf(37, 42, 21)"
--- Number 21.0
+-- Number 42.0
 --
 -- >>> runFakeT Nothing (oneOfArgs [])
 -- *** Exception: At least 1 argument required
@@ -155,7 +168,7 @@ oneOfArgs args = do
 -- | Create an array with `num` items
 --
 -- >>> exec "replicate(randomInt(2, 4), oneOf(37, 42, 21))"
--- Array [Number 42.0,Number 42.0,Number 21.0,Number 42.0]
+-- Array [Number 21.0,Number 21.0,Number 21.0]
 --
 replicate :: Expr -> Expr -> Fake Value
 replicate num expr = do
@@ -166,7 +179,7 @@ replicate num expr = do
 -- | Create an object from a list in the  [key, value [, ...]] form
 --
 -- >>> exec "object('x', randomInt(2, 4), oneOf('y', 'z'), 3)"
--- Object (fromList [("z",Number 3.0),("x",Number 4.0)])
+-- Object (fromList [("x",Number 3.0),("y",Number 3.0)])
 -- 
 objectFromArgs :: [Expr] -> Fake Value
 objectFromArgs args = do
@@ -211,16 +224,16 @@ maybeMErr _   (Just x) = pure x
 -- | Create random data that would be matched by the given regex
 --
 -- >>> exec "fromRegex('\\d-\\d{1,3}-FOO')"
--- String "5-67-FOO"
+-- String "0-421-FOO"
 --
 -- >>> exec "fromRegex('[a-z]{3}')"
--- String "esh"
+-- String "gqs"
 --
 -- >>> exec "fromRegex('[^0-9][0-9]B')"
--- String "\211735\&4B"
+-- String "\219172\&8B"
 --
 -- >>> exec "fromRegex('(\\d{4})')"
--- String "6763"
+-- String "4216"
 fromRegex :: (RandomGen g, MonadState g m, MonadError String m)
           => T.Text
           -> m T.Text
@@ -278,7 +291,7 @@ fromFile fileName = do
 -- | Generate a random character
 --
 -- >>> exec "randomChar()"
--- String "\629160"
+-- String "\487272"
 randomChar :: (RandomGen g, MonadState g m) => m Value
 randomChar = charToString <$> State.state random
   where
@@ -291,10 +304,10 @@ randomChar = charToString <$> State.state random
 -- lo and hi default to 1858-11-17 and 2132-09-01
 --
 -- >>> exec "randomDate()"
--- String "2063-01-23"
+-- String "1879-11-02"
 --
 -- >>> exec "randomDate('2001-01-01', '2018-12-31')"
--- String "2015-03-21"
+-- String "2014-06-14"
 --
 randomDate :: (MonadError String m, RandomGen g, MonadState g m)
            => Maybe T.Text
@@ -322,13 +335,13 @@ randomDate' lo hi = ModifiedJulianDay <$> State.state (randomR (lo', hi'))
 -- | Generate a random dateTime
 --
 -- >>> exec "randomDateTime()"
--- String "2063-01-23T16:57:46Z"
+-- String "1879-11-02T13:58:29Z"
 --
 -- >>> exec "randomDateTime('2019-10-10', '2019-10-20 17:00')"
--- String "2019-10-18T09:37:09Z"
+-- String "2019-10-20T16:26:29Z"
 --
 -- >>> exec "randomDateTime('2019-10-10 11:05', '2019-10-10 11:08')"
--- String "2019-10-10T11:07:52Z"
+-- String "2019-10-10T11:05:37Z"
 randomDateTime :: (MonadError String m, RandomGen g, MonadState g m)
                => Maybe T.Text
                -> Maybe T.Text
@@ -390,10 +403,10 @@ dayAsValue = String . T.pack . showGregorian
 -- | Create a value getter for an expression
 --
 -- >>> exec "uuid4()"
--- String "0099a82c-36f7-4321-8012-daa4305fd84b"
+-- String "686f6818-fa4e-4ae6-859a-35c08efc6738"
 --
 -- >>> exec "array(randomInt(1, 10), randomDouble(1, 20))"
--- Array [Number 5.0,Number 1.0000012432210876]
+-- Array [Number 7.0,Number 2.67433839866983]
 --
 eval :: Expr -> Fake Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x

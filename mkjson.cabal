@@ -34,7 +34,6 @@ common deps
     , mtl
     , optparse-applicative
     , parsec
-    , random
     , regex-tdfa
     , scientific
     , text
@@ -42,6 +41,8 @@ common deps
     , unordered-containers
     , uuid
     , vector
+    , random
+    , mersenne-random-pure64
 
 
 library
