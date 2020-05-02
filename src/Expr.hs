@@ -125,8 +125,8 @@ functionCall = do
     Just args' -> pure $ FunctionCall (Function name args')
   where
     functionArgs = between open close (expr `sepBy` comma)
-    open = char '('
-    close = char ')'
+    open = char '(' <* spaces
+    close = spaces *> char ')'
     comma = char ',' >> spaces
 
 
@@ -156,6 +156,9 @@ ident = do
 --
 -- >>> parseExpr "randomInt(0, 10)"
 -- Right (FunctionCall (Function {fcName = "randomInt", fcArgs = [IntLiteral 0,IntLiteral 10]}))
+--
+-- >>> parseExpr "randomInt( 0, 20 )"
+-- Right (FunctionCall (Function {fcName = "randomInt", fcArgs = [IntLiteral 0,IntLiteral 20]}))
 --
 -- >>> parseExpr "'fileName-200.txt'"
 -- Right (StringLiteral "fileName-200.txt")
