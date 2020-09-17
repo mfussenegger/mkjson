@@ -1,6 +1,6 @@
 # mkjson
 
-[![Build status](https://dev.azure.com/mfussenegger/mkjson/_apis/build/status/mkjson%20CI?branchName=master)](https://dev.azure.com/mfussenegger/mkjson/_build/latest?definitionId=7)
+[![CI](https://github.com/mfussenegger/mkjson/workflows/CI/badge.svg)](https://github.com/mfussenegger/mkjson/actions)
 
 `mkjson` is a CLI to generate JSON records.
 
