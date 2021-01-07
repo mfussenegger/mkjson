@@ -31,25 +31,6 @@ To generate infinite records, use:
 ```
 
 
-### Available providers
-
- - uuid1
- - uuid4
- - null
- - randomBool
- - randomChar
- - randomInt(lower, upper)
- - randomDouble(lower, upper)
- - randomDate [(lower, upper)]
- - randomDateTime [(lower, upper)]
- - array(expr [, ...])
- - oneOf(arrayExpr)
- - oneOf(expr, expr [, ...])
- - replicate(number, expr)
- - object(key, value [, ...])
- - fromFile(fileName)
- - fromRegex(pattern)
-
 ### Examples
 
 Using `fromFile` and `oneOf`:
@@ -83,6 +64,29 @@ Or use the `object` provider with various providers. Argument are `key, value [,
 {"obj":{"dt":"2099-09-11T16:33:41Z","xs":[6,8,5,2,0],"type":"ldwa-2667786160"}}
 ```
 
+You may also want to read this [introduction and sample use case][1].
+
+
+### Available providers
+
+ - uuid1
+ - uuid4
+ - null
+ - randomBool
+ - randomChar
+ - randomInt(lower, upper)
+ - randomDouble(lower, upper)
+ - randomDate [(lower, upper)]
+ - randomDateTime [(lower, upper)]
+ - array(expr [, ...])
+ - oneOf(arrayExpr)
+ - oneOf(expr, expr [, ...])
+ - replicate(number, expr)
+ - object(key, value [, ...])
+ - fromFile(fileName)
+ - fromRegex(pattern)
+
+
 ## Installation
 
 Get a pre-build binary from the
@@ -111,3 +115,6 @@ generation aspect of `mkjson`:
 
  - [jarg](https://github.com/jdp/jarg)
  - [jo](https://github.com/jpmens/jo)
+
+
+[1]: https://zignar.net/2020/05/01/generating-data-sets-using-mkjson/
