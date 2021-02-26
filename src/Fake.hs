@@ -53,6 +53,8 @@ import qualified System.Random.Mersenne.Pure64 as Rnd
 import qualified Text.Regex.TDFA.Pattern as R
 import qualified Text.Regex.TDFA.ReadRegex as R
 import Prelude hiding (lines, replicate)
+import Data.ULID.Random (mkULIDRandom)
+import Data.ULID.TimeStamp (getULIDTimeStamp)
 
 
 -- $setup
@@ -400,6 +402,13 @@ dayAsValue :: Day -> Value
 dayAsValue = String . T.pack . showGregorian
 
 
+ulid :: Fake Value
+ulid = do
+  ulidTimestamp <- liftIO getULIDTimeStamp
+  ulidRandom <- State.state mkULIDRandom
+  pure $ String . T.pack $ show ulidTimestamp <> show ulidRandom
+
+
 -- | Create a value getter for an expression
 --
 -- >>> exec "uuid4()"
@@ -415,6 +424,7 @@ eval (DoubleLiteral x) = pure $ Number x
 eval (JsonLiteral s) = pure s
 eval (Fn "uuid4" []) = String . UUID.toText <$> State.state random
 eval (Fn "uuid1" []) = String . UUID.toText <$> liftIO uuid1
+eval (Fn "ulid" []) = ulid
 eval (Fn "null" []) = pure Null
 eval (Fn "randomBool" []) = randomBool
 eval (Fn "randomChar" []) = randomChar

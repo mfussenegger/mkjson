@@ -43,6 +43,7 @@ common deps
     , vector
     , random
     , mersenne-random-pure64
+    , ulid
 
 
 library

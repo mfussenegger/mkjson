@@ -71,6 +71,7 @@ You may also want to read this [introduction and sample use case][1].
 
  - uuid1
  - uuid4
+ - ulid
  - null
  - randomBool
  - randomChar
