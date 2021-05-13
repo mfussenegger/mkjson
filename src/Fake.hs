@@ -82,6 +82,7 @@ type State a = StateT Env IO a
 
 data Env = Env
   { envStdGen :: !Rnd.PureMT
+  , envPatternCache :: !(M.HashMap T.Text R.Pattern)
   , envFileCache :: !(M.HashMap T.Text (V.Vector Value)) }
 
 instance RandomGen Env where
@@ -93,8 +94,10 @@ instance RandomGen Env where
       (g', g'') = split (envStdGen env)
 
 newEnv :: Maybe Int -> IO Env
-newEnv (Just seed) = pure $ Env (Rnd.pureMT (fromIntegral seed)) M.empty
-newEnv Nothing     = flip Env M.empty <$> Rnd.newPureMT
+newEnv (Just seed) = pure $ Env (Rnd.pureMT (fromIntegral seed)) M.empty M.empty
+newEnv Nothing     = do
+  stdgen <- Rnd.newPureMT
+  pure $ Env stdgen M.empty M.empty
 
 
 uuid1 :: IO UUID.UUID
@@ -234,13 +237,17 @@ maybeMErr _   (Just x) = pure x
 --
 -- >>> exec "fromRegex('(\\d{4})')"
 -- String "4216"
-fromRegex :: (RandomGen g, MonadState g m, MonadError String m)
-          => T.Text
-          -> m T.Text
-fromRegex input =
-  case R.parseRegex input' of
-    Right (pattern', _) -> generateText pattern'
-    Left err           -> Except.throwError $ show err
+fromRegex :: T.Text -> Fake T.Text
+fromRegex input = do
+  e@Env{envPatternCache} <- State.get
+  case M.lookup input envPatternCache of
+    Just pattern' -> generateText pattern'
+    Nothing ->
+      case R.parseRegex input' of
+        Right (pattern', _) -> do
+          State.put e { envPatternCache = M.insert input pattern' envPatternCache }
+          generateText pattern'
+        Left err           -> Except.throwError $ show err
   where
     input' = T.unpack input
     defaultUpper = 10
@@ -443,6 +450,6 @@ eval (Fn "fromFile" [fileName]) = fromFile fileName
 eval (Fn "fromRegex" [pattern']) =
   eval pattern'
   >>= Except.liftEither . A.asText
-  >>= Fake . fromRegex
+  >>= fromRegex
   <&> String
 eval (FunctionCall (Function name _)) = Except.throwError $ "No random generator for " <> T.unpack name
