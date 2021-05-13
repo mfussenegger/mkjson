@@ -24,7 +24,7 @@ import Data.Aeson (Value (..), object)
 import qualified Data.ByteString.Char8 as BS
 import Data.Functor ((<&>))
 import qualified Data.HashMap.Strict as M
-import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
+import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Scientific as S
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -111,8 +111,8 @@ uuid1 = do
 -- Number 1.0
 randomInt :: Expr -> Expr -> Fake Value
 randomInt lower upper = do
-  lower' <- Except.liftEither =<< A.asInt <$> eval lower
-  upper' <- Except.liftEither =<< A.asInt <$> eval upper
+  lower' <- Except.liftEither . A.asInt =<< eval lower
+  upper' <- Except.liftEither . A.asInt =<< eval upper
   Number . fromIntegral <$> State.state (randomR (lower', upper'))
 
 
@@ -125,8 +125,8 @@ randomInt lower upper = do
 -- Number 32.779306344575716
 randomDouble :: Expr -> Expr -> Fake Value
 randomDouble lower upper = do
-  lower' <- Except.liftEither =<< (S.toRealFloat <$>) . A.asScientific <$> eval lower :: Fake Double
-  upper' <- Except.liftEither =<< (S.toRealFloat <$>) . A.asScientific <$> eval upper :: Fake Double
+  lower' <- Except.liftEither . (S.toRealFloat <$>) . A.asScientific =<< eval lower :: Fake Double
+  upper' <- Except.liftEither . (S.toRealFloat <$>) . A.asScientific =<< eval upper :: Fake Double
   Number . S.fromFloatDigits <$> State.state (randomR (lower', upper'))
 
 
@@ -144,7 +144,7 @@ randomBool = Bool <$> State.state random
 -- Number 42.0
 oneOfArray :: Expr -> Fake Value
 oneOfArray arr = do
-  arr' <- Except.liftEither =<< A.asArray <$> eval arr
+  arr' <- Except.liftEither . A.asArray =<< eval arr
   idx <- State.state $ randomR (0, length arr' - 1)
   pure $ arr' V.! idx
 
@@ -172,7 +172,7 @@ oneOfArgs args = do
 --
 replicate :: Expr -> Expr -> Fake Value
 replicate num expr = do
-  num' <- Except.liftEither =<< A.asInt <$> eval num
+  num' <- Except.liftEither . A.asInt =<< eval num
   Array <$> V.replicateM num' (eval expr)
 
 
@@ -192,7 +192,7 @@ objectFromArgs args = do
     mkPairs (x : y : rest) = ((x, y) :) <$> mkPairs rest
     mkKeyValuePair :: (Expr, Expr) -> Fake (T.Text, Value)
     mkKeyValuePair (key, val) = do
-      key' <- eval key <&> A.asText >>= Except.liftEither
+      key' <- eval key >>= Except.liftEither . A.asText
       val' <- eval val
       pure (key', val')
 
@@ -276,7 +276,7 @@ fromRegex input =
 
 fromFile :: Expr -> Fake Value
 fromFile fileName = do
-  fileName' <- Except.liftEither =<< A.asText <$> eval fileName
+  fileName' <- Except.liftEither . A.asText =<< eval fileName
   e@Env{envFileCache} <- State.get
   case M.lookup fileName' envFileCache of
     (Just lines) -> pure $ Array lines
@@ -378,7 +378,7 @@ randomDateTime lo hi = do
 -- >>> parseDateTime "2019-10-21 21:30:59"
 -- Just 2019-10-21 21:30:59 UTC
 parseDateTime :: T.Text -> Maybe UTCTime
-parseDateTime dt = listToMaybe . catMaybes $ fmap parse formats
+parseDateTime dt = listToMaybe (mapMaybe parse formats)
   where
     formats =
       [ "%Y-%-m-%-d"
@@ -442,8 +442,7 @@ eval (Fn "object" args) = objectFromArgs args
 eval (Fn "fromFile" [fileName]) = fromFile fileName
 eval (Fn "fromRegex" [pattern']) =
   eval pattern'
-  <&> A.asText
-  >>= Except.liftEither
+  >>= Except.liftEither . A.asText
   >>= Fake . fromRegex
   <&> String
 eval (FunctionCall (Function name _)) = Except.throwError $ "No random generator for " <> T.unpack name
