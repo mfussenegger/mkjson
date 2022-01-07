@@ -86,9 +86,10 @@ data Env = Env
   , envFileCache :: !(M.HashMap T.Text (V.Vector Value)) }
 
 instance RandomGen Env where
-  next env = (x, env { envStdGen = g' })
-    where
-      (x, g') = next (envStdGen env)
+  genWord32 env@Env { envStdGen } = let (word32, g') = genWord32 envStdGen
+                                    in (word32, env { envStdGen = g' })
+  genWord64 env@Env { envStdGen } = let (word64, g') = genWord64 envStdGen
+                                    in (word64, env { envStdGen = g' })
   split env = (env { envStdGen = g' }, env { envStdGen = g'' })
     where
       (g', g'') = split (envStdGen env)
@@ -122,10 +123,10 @@ randomInt lower upper = do
 -- | Generate a random double
 --
 -- >>> exec "randomDouble(1.5, 3.0)"
--- Number 2.04241571695796
+-- Number 2.794350179355104
 --
 -- >>> exec "randomDouble(1.5, 88.0)"
--- Number 32.779306344575716
+-- Number 76.140860342811
 randomDouble :: Expr -> Expr -> Fake Value
 randomDouble lower upper = do
   lower' <- Except.liftEither . (S.toRealFloat <$>) . A.asScientific =<< eval lower :: Fake Double
@@ -144,7 +145,7 @@ randomBool = Bool <$> State.state random
 -- | Select one random item of an array
 --
 -- >>> exec "oneOf(array(37, 42, 21))"
--- Number 42.0
+-- Number 37.0
 oneOfArray :: Expr -> Fake Value
 oneOfArray arr = do
   arr' <- Except.liftEither . A.asArray =<< eval arr
@@ -155,7 +156,7 @@ oneOfArray arr = do
 -- | Select one random argument
 --
 -- >>> exec "oneOf(37, 42, 21)"
--- Number 42.0
+-- Number 37.0
 --
 -- >>> runFakeT Nothing (oneOfArgs [])
 -- *** Exception: At least 1 argument required
@@ -171,7 +172,7 @@ oneOfArgs args = do
 -- | Create an array with `num` items
 --
 -- >>> exec "replicate(randomInt(2, 4), oneOf(37, 42, 21))"
--- Array [Number 21.0,Number 21.0,Number 21.0]
+-- Array [Number 21.0,Number 37.0]
 --
 replicate :: Expr -> Expr -> Fake Value
 replicate num expr = do
@@ -182,8 +183,8 @@ replicate num expr = do
 -- | Create an object from a list in the  [key, value [, ...]] form
 --
 -- >>> exec "object('x', randomInt(2, 4), oneOf('y', 'z'), 3)"
--- Object (fromList [("x",Number 3.0),("y",Number 3.0)])
--- 
+-- Object (fromList [("x",Number 2.0),("y",Number 3.0)])
+--
 objectFromArgs :: [Expr] -> Fake Value
 objectFromArgs args = do
   let
@@ -227,16 +228,16 @@ maybeMErr _   (Just x) = pure x
 -- | Create random data that would be matched by the given regex
 --
 -- >>> exec "fromRegex('\\d-\\d{1,3}-FOO')"
--- String "0-421-FOO"
+-- String "8-840-FOO"
 --
 -- >>> exec "fromRegex('[a-z]{3}')"
--- String "gqs"
+-- String "iyu"
 --
 -- >>> exec "fromRegex('[^0-9][0-9]B')"
--- String "\219172\&8B"
+-- String "\552818\&8B"
 --
 -- >>> exec "fromRegex('(\\d{4})')"
--- String "4216"
+-- String "8840"
 fromRegex :: T.Text -> Fake T.Text
 fromRegex input = do
   e@Env{envPatternCache} <- State.get
@@ -298,7 +299,7 @@ fromFile fileName = do
 -- | Generate a random character
 --
 -- >>> exec "randomChar()"
--- String "\487272"
+-- String "\815599"
 randomChar :: (RandomGen g, MonadState g m) => m Value
 randomChar = charToString <$> State.state random
   where
@@ -311,10 +312,10 @@ randomChar = charToString <$> State.state random
 -- lo and hi default to 1858-11-17 and 2132-09-01
 --
 -- >>> exec "randomDate()"
--- String "1879-11-02"
+-- String "1936-12-18"
 --
 -- >>> exec "randomDate('2001-01-01', '2018-12-31')"
--- String "2014-06-14"
+-- String "2011-10-20"
 --
 randomDate :: (MonadError String m, RandomGen g, MonadState g m)
            => Maybe T.Text
@@ -342,13 +343,13 @@ randomDate' lo hi = ModifiedJulianDay <$> State.state (randomR (lo', hi'))
 -- | Generate a random dateTime
 --
 -- >>> exec "randomDateTime()"
--- String "1879-11-02T13:58:29Z"
+-- String "1936-12-18T05:21:21Z"
 --
 -- >>> exec "randomDateTime('2019-10-10', '2019-10-20 17:00')"
--- String "2019-10-20T16:26:29Z"
+-- String "2019-10-18T04:12:09Z"
 --
 -- >>> exec "randomDateTime('2019-10-10 11:05', '2019-10-10 11:08')"
--- String "2019-10-10T11:05:37Z"
+-- String "2019-10-10T11:06:54Z"
 randomDateTime :: (MonadError String m, RandomGen g, MonadState g m)
                => Maybe T.Text
                -> Maybe T.Text
@@ -410,10 +411,10 @@ dayAsValue = String . T.pack . showGregorian
 -- | Create a value getter for an expression
 --
 -- >>> exec "uuid4()"
--- String "686f6818-fa4e-4ae6-859a-35c08efc6738"
+-- String "2318fa4e-bb68-4f68-b935-c08e7ae6459a"
 --
 -- >>> exec "array(randomInt(1, 10), randomDouble(1, 20))"
--- Array [Number 7.0,Number 2.67433839866983]
+-- Array [Number 9.0,Number 11.003947581369095]
 --
 eval :: Expr -> Fake Value
 eval (IntLiteral x)    = pure $ Number $ fromInteger x
