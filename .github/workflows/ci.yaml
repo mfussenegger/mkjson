@@ -2,6 +2,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request: ~
   push:
     branches:
@@ -13,24 +14,33 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+        ghc: ["8.10.7"]
+        stack: ["2.7.3"]
+
     steps:
       - name: Checkout repo
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
+
+      - name: Setup Haskell Stack
+        uses: haskell/actions/setup@v1.2
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          stack-version: ${{ matrix.stack }}
 
       - name: Cache dependencies
-        id: cache
-        uses: actions/cache@v1
+        uses: actions/cache@v2
         with:
           path: ~/.stack
-          key: ${{ runner.os }}-stack-${{ hashFiles('stack.yaml.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-stack-
+          key: ${{ runner.os }}-${{ matrix.ghc }}-stack
 
-      - name: Build snapshot
-        if: steps.cache.outputs.cache-hit != 'true'
+      - name: Install dependencies
         run: |
-          stack --no-terminal build --pedantic --flag mkjson:-static --test --only-snapshot
+          stack --no-terminal build --system-ghc --pedantic --flag mkjson:-static --test --only-dependencies
 
-      - name: Build and test Haskell code
+      - name: Build
         run: |
-          stack --no-terminal build --pedantic --flag mkjson:-static --test
+          stack --no-terminal build --system-ghc --pedantic --flag mkjson:-static
+
+      - name: Test
+        run: |
+          stack --no-terminal test --system-ghc --pedantic --flag mkjson:-static
