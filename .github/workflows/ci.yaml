@@ -14,8 +14,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        ghc: ["8.10.7"]
-        stack: ["2.7.3"]
+        ghc: ["9.2.5"]
+        stack: ["2.9.3"]
 
     steps:
       - name: Checkout repo

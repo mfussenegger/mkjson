@@ -38,7 +38,6 @@ import Data.Time.Clock
 import Data.Time.Format
   ( defaultTimeLocale,
     formatTime,
-    iso8601DateFormat,
     parseTimeM,
   )
 import qualified Data.UUID as UUID
@@ -53,6 +52,8 @@ import qualified System.Random.Mersenne.Pure64 as Rnd
 import qualified Text.Regex.TDFA.Pattern as R
 import qualified Text.Regex.TDFA.ReadRegex as R
 import Prelude hiding (lines, replicate)
+import Data.Aeson.Key (fromText)
+import Data.Aeson.Types (Pair)
 
 
 -- $setup
@@ -194,11 +195,11 @@ objectFromArgs args = do
     mkPairs [] = Right []
     mkPairs [_] = Left "Arguments to object must be a multiple of 2 (key + value pairs)"
     mkPairs (x : y : rest) = ((x, y) :) <$> mkPairs rest
-    mkKeyValuePair :: (Expr, Expr) -> Fake (T.Text, Value)
+    mkKeyValuePair :: (Expr, Expr) -> Fake Pair
     mkKeyValuePair (key, val) = do
       key' <- eval key >>= Except.liftEither . A.asText
       val' <- eval val
-      pure (key', val')
+      pure (fromText key', val')
 
 
 rndListItem :: (RandomGen g, MonadState g m) => [a] -> m (Maybe a)
@@ -359,8 +360,7 @@ randomDateTime lo hi = do
   pico <- State.state (randomR (loPico, hiPico))
   pure . String . T.pack . formatDateTime $ UTCTime day (picosecondsToDiffTime pico)
   where
-    formatDateTime = formatTime defaultTimeLocale isoFormat
-    isoFormat = iso8601DateFormat (Just "%H:%M:%SZ")
+    formatDateTime = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ"
     lo' = lo >>= parseDateTime
     hi' = hi >>= parseDateTime
     loDay = utctDay <$> lo'
