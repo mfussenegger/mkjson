@@ -7,6 +7,7 @@ import qualified Cli
 import Control.Monad (forever, replicateM)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (encode, object)
+import Data.Aeson.Key (fromText)
 import Data.Bifunctor (second)
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Fake (eval, runFakeT)
@@ -29,4 +30,4 @@ main = do
     loop (Cli.Const n) = replicateM n
     evalField (column, fakeExpr) = do
       val <- fakeExpr
-      pure (column, val)
+      pure (fromText column, val)
