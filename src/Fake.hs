@@ -54,6 +54,7 @@ import qualified Text.Regex.TDFA.ReadRegex as R
 import Prelude hiding (lines, replicate)
 import Data.Aeson.Key (fromText)
 import Data.Aeson.Types (Pair)
+import qualified Data.Either as V
 
 
 -- $setup
@@ -152,6 +153,44 @@ oneOfArray arr = do
   arr' <- Except.liftEither . A.asArray =<< eval arr
   idx <- State.state $ randomR (0, length arr' - 1)
   pure $ arr' V.! idx
+
+
+-- | Join argument expressions into a string.
+--
+-- If there is more than one argument the first first argument is used as separator.
+-- If there is a single argument and it is an array, the array is concattenated.
+--
+-- >>> exec "join(['Hello', 'World'])"
+-- String "HelloWorld"
+--
+-- >>> exec "join('-', 'Hello', 'World')"
+-- String "Hello-World"
+--
+-- >>> exec "join('foo')"
+-- String "foo"
+--
+-- >>> exec "join([1, 2, 3])"
+-- String "123"
+--
+-- >>> exec "join()"
+-- String ""
+joinArgs :: [Expr] -> Fake Value
+joinArgs [] = pure $ String ""
+joinArgs [arg] = do
+  val <- eval arg
+  pure $ case val of
+    (String _) -> val
+    (Array arr') -> do
+      let strings = V.rights . V.toList $ fmap A.asText arr'
+          text = T.intercalate "" strings
+      String text
+    _ -> error $ "Expected a string or array, but received: " <> show val
+joinArgs (x:xs) = do
+  sep <- Except.liftEither . A.asText =<< eval x
+  values <- mapM eval xs
+  let strings = V.rights $ fmap A.asText values
+      text = T.intercalate sep strings
+  pure $ String text
 
 
 -- | Select one random argument
@@ -443,6 +482,7 @@ eval (Fn "randomDateTime" [lower, upper]) = do
   upper' <- rightToMaybe . A.asText <$> eval upper
   randomDateTime lower' upper'
 eval (Fn "array" args) = Array . V.fromList <$> mapM eval args
+eval (Fn "join" args) = joinArgs args
 eval (Fn "oneOf" [arg]) = oneOfArray arg
 eval (Fn "oneOf" args) = oneOfArgs args
 eval (Fn "replicate" [num, expr]) = replicate num expr

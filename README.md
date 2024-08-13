@@ -85,6 +85,8 @@ You may also want to read this [introduction and sample use case][1].
  - object(key, value [, ...])
  - fromFile(fileName)
  - fromRegex(pattern)
+ - join(sep, val1, [, ...])
+ - join(array)
 
 
 ## Installation
