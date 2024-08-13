@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 
 module Aeson (
   asInt,
@@ -65,7 +66,12 @@ asArray o         = Left $ "Expected an array, but received: " <> show o
 --
 -- >>> asText (Number 10.3)
 -- Right "10.3"
+--
+-- >>> asText (Number 4)
+-- Right "4"
 asText :: Value -> Either String T.Text
 asText (String t) = Right t
-asText (Number n) = Right . T.pack $ show n
+asText (Number n) = Right $ case (S.toBoundedInteger n :: Maybe Int) of
+  Nothing -> T.pack $ show n
+  Just int -> T.pack $ show int
 asText o          = Left $ "Expected a string, but received: " <> show o
