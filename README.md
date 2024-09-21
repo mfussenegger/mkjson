@@ -91,6 +91,14 @@ You may also want to read this [introduction and sample use case][1].
 
 ## Installation
 
+### Arch AUR
+
+```bash
+sudo yay -S mkjson-git
+```
+
+### Manual Installation
+
 Get a pre-build binary from the
 [releases](https://github.com/mfussenegger/mkjson/releases) page or build it
 yourself:
