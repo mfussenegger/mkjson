@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup Haskell Stack
         uses: haskell/actions/setup@v1.2
@@ -28,7 +28,7 @@ jobs:
           stack-version: ${{ matrix.stack }}
 
       - name: Cache dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ~/.stack
           key: ${{ runner.os }}-${{ matrix.ghc }}-stack
