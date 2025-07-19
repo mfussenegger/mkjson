@@ -1,3 +1,7 @@
+# Status
+
+Development moved to [codeberg](https://codeberg.org/mfussenegger/mkjson)
+
 # mkjson
 
 [![CI](https://github.com/mfussenegger/mkjson/workflows/CI/badge.svg)](https://github.com/mfussenegger/mkjson/actions)
